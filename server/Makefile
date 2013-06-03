@@ -2,7 +2,7 @@
 CC=gcc
 #COPTS=-Wall -std=c99 -O3
 COPTS=-Wall -std=c99
-OBJECTS=main.o errors.o server.o handler.o
+OBJECTS=main.o errors.o server.o handler.o mystring.o
 .PHONY: clean
 
 server: $(OBJECTS)
@@ -17,9 +17,11 @@ errors.o: errors.c
 server.o: server.c errors.h callback.h
 	$(CC) $(COPTS) -c $< -o $@
 
-handler.o: handler.c
+handler.o: handler.c mystring.h
 	$(CC) $(COPTS) -c $< -o $@
 
+mystring.o: mystring.c
+	$(CC) $(COPTS) -c $< -o $@
 
 clean:
 	-rm -r $(OBJECTS)
