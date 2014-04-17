@@ -15,8 +15,8 @@
 #include "errors.h"
 #include "mystring.h"
 
-#ifdef USE_DRAFT_HEADER
-#  ifdef AC468F3
+#ifndef USE_ALT_HEADER
+#  ifndef PRE_AC468F3
 /*PRI * HTTP/2.0\r\n\r\nSM\r\n\r\n*/
 const char CONNECTION_HEADER[] = {
 	0x50,0x52,0x49,0x20,0x2a,0x20,0x48,0x54,

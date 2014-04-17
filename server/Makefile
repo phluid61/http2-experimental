@@ -2,7 +2,7 @@
 CC=gcc
 #COPTS=-Wall -std=c99 -O3
 COPTS=-Wall -std=c99
-HANDLER_OPTS=-D USE_DRAFT_HEADER -D AC468F3
+HANDLER_OPTS=
 OBJECTS=main.o errors.o server.o handler.o mystring.o
 .PHONY: clean
 
