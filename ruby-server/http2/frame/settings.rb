@@ -9,6 +9,7 @@ class HTTP2_Frame_SETTINGS
 	PARAMETERS = [
 		nil, :SETTINGS_HEADER_TABLE_SIZE, :SETTINGS_ENABLE_PUSH,
 		:SETTINGS_MAX_CONCURRENT_STREAMS, :SETTINGS_INITIAL_WINDOW_SIZE,
+		:SETTINGS_ACCEPT_COMPRESSION,
 	]
 
 	def self.from f
@@ -65,6 +66,10 @@ class HTTP2_Frame_SETTINGS
 			id = 4
 			# MUST NOT exceed 2**31-1
 			raise ArgumentError if v >= 2**31
+		when :SETTINGS_ACCEPT_COMPRESSION, :ACCEPT_COMPRESSION, 5
+			id = 5
+			# MUST be 0 or 1
+			raise ArgumentError unless v == 0 || v == 1
 		else
 			raise ArgumentError
 		end

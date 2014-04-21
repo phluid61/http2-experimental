@@ -13,4 +13,3 @@ rescue Exception => e
 	p e
 	puts e.backtrace.map{|b| "\t#{b}" }
 end
-

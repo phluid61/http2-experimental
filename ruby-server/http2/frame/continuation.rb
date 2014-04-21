@@ -3,62 +3,51 @@ require_relative 'padded_frame'
 require_relative '../frame'
 require_relative '../error'
 
-class HTTP2_Frame_DATA
+class HTTP2_Frame_CONTINUATION
 
-	FLAG_END_STREAM  = 0x01
-	FLAG_END_SEGMENT = 0x02
-	#~~~~              0x04
+	FLAG_END_HEADERS = 0x04
 	#FLAG_PAD_LOW     = 0x08
 	#FLAG_PAD_HIGH    = 0x10
-	#FLAG_COMPRESSED  = 0x20
 
 	def self.from f
-		raise ArgumentError unless f.type_symbol == :DATA
+		raise ArgumentError unless f.type_symbol == :CONTINUATION
 		raise PROTOCOL_ERROR if f.stream_id == 0
 		pad, payload = PaddedFrame.extract_padding_from f
 		raise PROTOCOL_ERROR if payload.bytesize < pad
 		g = self.new payload.byteslice(0,-pad), padding: pad
 		g.end_stream! if f.flags & FLAG_END_STREAM == FLAG_END_STREAM
 		g.end_segment! if f.flags & FLAG_END_SEGMENT == FLAG_END_SEGMENT
+		g.end_headers! if f.flags & FLAG_END_HEADERS == FLAG_END_HEADERS
 		g
 	end
 
-	def initialize data, padding: 0
-		self.data = data
+	def initialize fragment, padding: 0
+		self.fragment = fragment
 		self.padding = padding
-		@frame = HTTP2_Frame.new :DATA
+		@frame = HTTP2_Frame.new :CONTINUATION
 		__update_frame
 	end
 
-	attr_reader :data, :padding
+	attr_reader :fragment, :padding
 
-	def end_stream?
-		@frame.flags & FLAG_END_STREAM == FLAG_END_STREAM
-	end
-
-	def end_segment?
-		@frame.flags & FLAG_END_SEGMENT == FLAG_END_SEGMENT
+	def end_headers?
+		@frame.flags & FLAG_END_HEADERS == FLAG_END_HEADERS
 	end
 
 	def stream_id
 		@frame.stream_id
 	end
 
-	def data= d
-		d = d.to_s
+	def fragment= f
+		f = f.to_s
 		# FIXME: range check here!
-		#raise ArgumentError if d.bytesize != 8
-		@data = d
+		#raise ArgumentError if f.bytesize != 8
+		@fragment = f
 		__update_frame if @frame
 	end
 
-	def end_stream!
-		@frame.flags |= FLAG_END_STREAM
-		self
-	end
-
-	def end_segment!
-		@frame.flags |= FLAG_END_SEGMENT
+	def end_headers!
+		@frame.flags |= FLAG_END_HEADERS
 		self
 	end
 
@@ -72,7 +61,7 @@ class HTTP2_Frame_DATA
 		__update_frame if @frame
 	end
 	def pad_to total, truncate: false
-		pad = total - @data.bytesize
+		pad = total - @fragment.bytesize
 		raise ArgumentError if pad < 0 && !truncate
 		if pad > 0
 			self.padding = pad
@@ -87,10 +76,9 @@ class HTTP2_Frame_DATA
 
 	def __update_frame
 		flags, head, tail = PaddedFrame.generate_padding @padding
-		flags |= FLAG_END_STREAM if end_stream?
-		flags |= FLAG_END_SEGMENT if end_segment?
+		flags |= FLAG_END_HEADERS if end_headers?
 		@frame.flags = flags
-		@frame.payload = head + @data + tail
+		@frame.payload = head + @fragment + tail
 	end
 
 end

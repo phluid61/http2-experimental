@@ -17,10 +17,13 @@ class HTTP2_Server
 		@tp = ThreadPuddle.new 100
 
 		srv = TCPServer.new @port
-		loop do
-			@tp.spawn(srv.accept) {|cl| HTTP2_Connection.handle cl }
-		end
+		loop {
+			@tp.spawn(srv.accept) do |cl|
+				conn = HTTP2_Connection.new(cl)
+				conn.max_concurrent_streams = $MAX_CONCURRENT_STREAMS
+				conn.start
+			end
+		}
 	end
 
 end
-
