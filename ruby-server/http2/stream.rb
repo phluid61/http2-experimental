@@ -24,17 +24,10 @@ class HTTP2_Stream
 		@local
 	end
 
-	def recv_headers f
+	def recv_headers f, *cs
 		case @state
 		when :idle, :open
-			next_state = (f.end_stream? ? :half_closed_remote : :open)
-			if f.end_headers?
-				@state = next_state
-			elsif f.end_segment?
-				raise "FIXME: I don't know what this means!"
-			else
-				@accept_continuation = next_state
-			end
+			@state = (f.end_stream? ? :half_closed_remote : :open)
 		# FIXME: this goes in the #send_headers function!
 #		when :reserved_local
 #			next_state = :half_closed_remote
@@ -47,19 +40,10 @@ class HTTP2_Stream
 			raise PROTOCOL_ERROR
 		end
 		@headers_recvd << f.fragment
-		emit if f.end_segment? || f.end_stream?
-	end
-
-	def recv_continuation f
-		raise PROTOCOL_ERROR unless @accept_continuation
-		@headers_recvd << f.fragment
-		if f.end_headers?
-			@state = @accept_continuation
-			@accept_continuation = false
-			# FIXME: is this the only way to tell that the HEADERS
-			#        frame had the END_STREAM flag set?
-			emit if @state == :half_closed_remote
+		cs.each do |c|
+			@headers_recvd << c.fragment
 		end
+		emit if f.end_segment? || f.end_stream?
 	end
 
 	def recv_data f

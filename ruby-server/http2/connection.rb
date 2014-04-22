@@ -14,6 +14,7 @@ class HTTP2_Connection
 	def initialize peer
 		STDERR.puts "[#{Time.now}] new connection from #{peer.inspect}"
 		@peer = peer
+		@started = false
 
 		# Peer's settings
 		@peer_header_table_size = 4096
@@ -43,23 +44,30 @@ class HTTP2_Connection
 	def header_table_size= s
 		# FIXME: validate
 		@header_table_size = s
+		#send_settings if @started
 	end
 	def enable_push= p
 		@enable_push = !!p
+		#send_settings if @started
 	end
 	def max_concurrent_streams= x
 		# FIXME: validate
 		@max_concurrent_streams = x
+		#send_settings if @started
 	end
 	def initial_window_size= s
 		# FIXME: validate
 		@initial_window_size = s
+		#send_settings if @started
 	end
 	def accept_compression= c
 		@accept_compression = !!c
+		#send_settings if @started
 	end
 
 	def start
+		raise if @started
+		@started = true
 
 		# Receive standard header
 		intro = @peer.read(24)
@@ -81,7 +89,7 @@ class HTTP2_Connection
 		STDERR.puts "[#{Time.now}] #{@peer.inspect}: settings..."
 
 		# Wait for ACK
-		recv {|g| g.type_symbol == :SETTINGS && g.flags | HTTP2_Frame_SETTINGS::FLAG_ACK }
+		recv {|g| g.type_symbol == :SETTINGS && (g.flags & HTTP2_Frame_SETTINGS::FLAG_ACK == HTTP2_Frame_SETTINGS::FLAG_ACK) }
 		STDERR.puts "[#{Time.now}] #{@peer.inspect}: got ack"
 
 		# Accept frames, and farm them out to appropriate whatsernames
@@ -116,22 +124,24 @@ class HTTP2_Connection
 				if headers.stream_id > @max_sid
 					@max_sid = headers.stream_id
 					@streams[headers.stream_id] = HTTP2_Stream.new
-				else
-					stream = @streams[headers.stream_id]
-					if stream
-						stream.recv_headers headers
-					else
-						goaway(:PROTOCOL_ERROR, debug_data: "#{headers.stream_id}?? < #{@max_sid}")
+				end
+				stream = @streams[headers.stream_id]
+				if stream
+					frames = [headers]
+					flag = HTTP2_Frame_HEADERS::FLAG_END_HEADERS
+					f = headers
+					until f.end_headers?
+						f = recv {|g| (g.type_symbol == :CONTINUATION && (g.flags & flag == flag)) or raise PROTOCOL_ERROR } #XXX
+						raise PROTOCOL_ERROR unless f.stream_id == headers.stream_id #XXX
+						frames << HTTP2_Frame_CONTINUATION.from(f)
 					end
+					stream.recv_headers *frames
+				else
+					goaway(:PROTOCOL_ERROR, debug_data: "#{headers.stream_id}?? < #{@max_sid}")
 				end
 			when :CONTINUATION
-				continuation = HTTP2_Frame_CONTINUATION.from frame
-				stream = @streams[continuation.stream_id]
-				if stream
-					stream.recv_continuation continuation
-				else
-					goaway(:PROTOCOL_ERROR, debug_data: "#{continuation.stream_id}??")
-				end
+				# Should never come out of the blue
+				goaway(:PROTOCOL_ERROR, debug_data: "#{continuation.stream_id}??")
 			when :DATA
 				data = HTTP2_Frame_DATA.from frame
 				stream = @streams[data.stream_id]
