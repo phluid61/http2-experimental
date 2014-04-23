@@ -8,7 +8,7 @@ class HTTP2_Frame_GOAWAY
 		raise ArgumentError unless f.type_symbol == :GOAWAY
 		raise PROTOCOL_ERROR unless f.stream_id == 0
 		raise PROTOCOL_ERROR if f.length < 64
-		sid, err, dd = f.payload.unpack 'CL<a*'
+		sid, err, dd = f.payload.unpack 'CL>a*'
 		self.new err, last_stream_id: sid, debug_data: dd
 	end
 
@@ -49,7 +49,7 @@ class HTTP2_Frame_GOAWAY
 	end
 
 	def __serialize dd
-		[@last_stream_id, @error_code].pack('L<L<') + dd
+		[@last_stream_id, @error_code].pack('L>L>') + dd
 	end
 
 end

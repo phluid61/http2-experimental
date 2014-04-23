@@ -11,13 +11,13 @@ module PrioritisedFrame
 				raise PROTOCOL_ERROR
 			end
 			flags |= FLAG_PRIORITY_GROUP
-			[pgi, weight] = payload.unpack('L<C')
+			[pgi, weight] = payload.unpack('L>C')
 			pg = PriorityGroup.new(pgi&0x7FFF_FFFF, weight+1)
 			payload = payload.byteslice(5,-1)
 		end
 		if frame.flags & FLAG_PRIORITY_DEPENDENCY = FLAG_PRIORITY_DEPENDENCY
 			flags |= FLAG_PRIORITY_DEPENDENCY
-			sd = payload.unpack('L<')
+			sd = payload.unpack('L>')
 			pd = PriorityDependency.new(sd & 0x7FFF_FFFF, (sd & 0x8000_0000 == 0x8000_0000))
 			payload = payload.byteslice(4,-1)
 		end
@@ -28,12 +28,12 @@ module PrioritisedFrame
 		case pr
 		when PriorityGroup
 			flags |= FLAG_PRIORITY_GROUP
-			body << [p.group, p.weight].pack('L<C')
+			body << [p.group, p.weight].pack('L>C')
 		when PriorityDependency
 			flags |= FLAG_PRIORITY_DEPENDENCY
 			dep = p.stream
 			dep |= 0x8000_0000 if p.exclusive?
-			body << [dep].pack('L<')
+			body << [dep].pack('L>')
 		end
 		[flags, body]
 	end

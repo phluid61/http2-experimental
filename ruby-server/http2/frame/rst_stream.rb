@@ -8,9 +8,7 @@ class HTTP2_Frame_RST_STREAM
 		raise ArgumentError unless f.type_symbol == :RST_STREAM
 		raise PROTOCOL_ERROR if f.stream_id == 0
 		raise PROTOCOL_ERROR if f.length != 4
-		g = self.new f.payload
-		g.pong! if f.flags & FLAG_ACK == FLAG_ACK
-		g
+		self.new f.stream_id, f.payload.unpack('L>').first
 	end
 
 	def initialize stream_id, error_code
@@ -38,7 +36,7 @@ class HTTP2_Frame_RST_STREAM
 	end
 
 	def __serialize
-		[@error_code].pack 'L<'
+		[@error_code].pack 'L>'
 	end
 
 end

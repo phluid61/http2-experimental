@@ -10,7 +10,7 @@ module PaddedFrame
 		pad = 0
 		if frame.flags & FLAG_PAD_HIGH == FLAG_PAD_HIGH
 			raise PROTOCOL_ERROR unless frame.flags & FLAG_PAD_LOW == FLAG_PAD_LOW
-			pad += payload.unpack('S<').first
+			pad += payload.unpack('S>').first
 			payload = payload.byteslice(1,-1)
 		elsif frame.flags & FLAG_PAD_LOW == FLAG_PAD_LOW
 			pad += payload.unpack('C').first
@@ -23,7 +23,7 @@ module PaddedFrame
 	def self.generate_padding p, flags: 0, head: '', tail: ''
 		if p > 0xFF
 			flags |= FLAG_PAD_HIGH | FLAG_PAD_LOW
-			head << [p].pack('S<')
+			head << [p].pack('S>')
 			tail << (PAD_OCTET * @padding)
 		elsif p > 0
 			flags |= FLAG_PAD_LOW

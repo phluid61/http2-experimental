@@ -28,14 +28,9 @@ class HTTP2_Stream
 		case @state
 		when :idle, :open
 			@state = (f.end_stream? ? :half_closed_remote : :open)
-		# FIXME: this goes in the #send_headers function!
-#		when :reserved_local
-#			next_state = :half_closed_remote
-#			if f.end_headers?
-#				@state = next_state
-#			else
-#				@accept_continuation = next_state
-#			end
+		when :reserved_remote
+			# FIXME: can this go to fully closed with end_stream?
+			@state = :half_closed_local
 		else
 			raise PROTOCOL_ERROR
 		end
@@ -43,7 +38,21 @@ class HTTP2_Stream
 		cs.each do |c|
 			@headers_recvd << c.fragment
 		end
-		emit if f.end_segment? || f.end_stream?
+		emit_message if f.end_segment? || f.end_stream?
+	end
+
+	def recv_push_promise f, *cs
+		case @state
+		when :idle
+			@state = :reserved_remote
+		else
+			raise PROTOCOL_ERROR
+		end
+		@headers_recvd << f.fragment
+		cs.each do |c|
+			@headers_recvd << c.fragment
+		end
+		emit_pp # warn the API that there's a PP incoming
 	end
 
 	def recv_data f
@@ -52,10 +61,14 @@ class HTTP2_Stream
 			@state = :half_closed_remote
 		end
 		@data_recvd << f.data
-		emit if f.end_segment? || f.end_stream?
+		emit_message if f.end_segment? || f.end_stream?
 	end
 
 	def recv_priority f
+		# TODO
+	end
+
+	def recv_window_update f
 		# TODO
 	end
 
@@ -64,10 +77,18 @@ class HTTP2_Stream
 		# TODO
 	end
 
-	def emit
-		# TODO: actually, you know, *emit* it...
+	def recv_altsvc f
+		# TODO
+	end
+
+	def emit_message
+		@conn.handle_message @id, @headers_recvd, @data_recvd
 		@headers_recvd = ''
 		@data_recvd = ''
+	end
+
+	def emit_pp
+		@conn.handle_pp @id, @headers_recvd
 	end
 
 end

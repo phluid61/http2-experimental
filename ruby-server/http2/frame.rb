@@ -5,12 +5,12 @@ require_relative 'frame/priority'
 require_relative 'frame/rst_stream'
 require_relative 'frame/settings'
 require_relative 'frame/settings_ack'
-#require_relative 'frame/push_promise'
+require_relative 'frame/push_promise'
 require_relative 'frame/ping'
 require_relative 'frame/goaway'
-#require_relative 'frame/window_update'
-#require_relative 'frame/continuation'
-#require_relative 'frame/altsvc'
+require_relative 'frame/window_update'
+require_relative 'frame/continuation'
+require_relative 'frame/altsvc'
 
 class HTTP2_Frame
 
@@ -34,7 +34,7 @@ class HTTP2_Frame
 	def self.recv_from io
 		# Read the header
 		packed = self._read 8
-		length, type, flags, stream_id = packed.unpack 'S<CCL<'
+		length, type, flags, stream_id = packed.unpack 'S>CCL>'
 		length &= 0x3fff
 		stream_id &= 0x7fffffff
 
@@ -98,7 +98,7 @@ class HTTP2_Frame
 	end
 
 	def to_s
-		[length, type, flags, stream_id].pack('S<CCL<') + @payload
+		[length, type, flags, stream_id].pack('S>CCL>') + @payload
 	end
 
 end

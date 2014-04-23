@@ -17,16 +17,16 @@ class HTTP2_Frame_DATA
 		raise PROTOCOL_ERROR if f.stream_id == 0
 		pad, payload = PaddedFrame.extract_padding_from f
 		raise PROTOCOL_ERROR if payload.bytesize < pad
-		g = self.new payload.byteslice(0,-pad), padding: pad
+		g = self.new f.stream_id, payload.byteslice(0,-pad), padding: pad
 		g.end_stream! if f.flags & FLAG_END_STREAM == FLAG_END_STREAM
 		g.end_segment! if f.flags & FLAG_END_SEGMENT == FLAG_END_SEGMENT
 		g
 	end
 
-	def initialize data, padding: 0
+	def initialize stream_id, data, padding: 0
 		self.data = data
 		self.padding = padding
-		@frame = HTTP2_Frame.new :DATA
+		@frame = HTTP2_Frame.new :DATA, stream_id: stream_id
 		__update_frame
 	end
 
@@ -47,7 +47,7 @@ class HTTP2_Frame_DATA
 	def data= d
 		d = d.to_s
 		# FIXME: range check here!
-		#raise ArgumentError if d.bytesize != 8
+		#raise ArgumentError if d.bytesize >= 2**14
 		@data = d
 		__update_frame if @frame
 	end

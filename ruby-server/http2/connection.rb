@@ -16,6 +16,9 @@ class HTTP2_Connection
 		@peer = peer
 		@started = false
 
+		@message_handlers = []
+		@pp_handlers = []
+
 		# Peer's settings
 		@peer_header_table_size = 4096
 		@peer_enable_push = true
@@ -65,8 +68,30 @@ class HTTP2_Connection
 		#send_settings if @started
 	end
 
+	# Add an on_message handler.
+	def on_message &handler
+		@message_handlers << handler
+	end
+	# Handle a message (from the stream)
+	def handle_message stream, headers, data
+		@message_handlers.each do |h|
+			h.call stream, headers, data
+		end
+	end
+
+	# Add an on_pp handler.
+	def on_pp &handler
+		@pp_handlers << handler
+	end
+	# Handle a push promise (from the stream)
+	def handle_pp stream, headers
+		@pp_handlers.each do |h|
+			h.call stream, headers
+		end
+	end
+
 	def start
-		raise if @started
+		raise "already started" if @started
 		@started = true
 
 		# Receive standard header
@@ -123,9 +148,10 @@ class HTTP2_Connection
 				headers = HTTP2_Frame_HEADERS.from frame
 				if headers.stream_id > @max_sid
 					@max_sid = headers.stream_id
-					@streams[headers.stream_id] = HTTP2_Stream.new
+					@streams[headers.stream_id] = HTTP2_Stream.new(headers.stream_id, self)
 				end
 				stream = @streams[headers.stream_id]
+				# FIXME: HPACK!
 				if stream
 					frames = [headers]
 					flag = HTTP2_Frame_HEADERS::FLAG_END_HEADERS
@@ -137,18 +163,18 @@ class HTTP2_Connection
 					end
 					stream.recv_headers *frames
 				else
-					goaway(:PROTOCOL_ERROR, debug_data: "#{headers.stream_id}?? < #{@max_sid}")
+					goaway(:PROTOCOL_ERROR, debug_data: "HEADERS on #{headers.stream_id} (?? < #{@max_sid})")
 				end
 			when :CONTINUATION
 				# Should never come out of the blue
-				goaway(:PROTOCOL_ERROR, debug_data: "#{continuation.stream_id}??")
+				goaway(:PROTOCOL_ERROR, debug_data: "unexpected CONTINUATION on #{frame.stream_id}")
 			when :DATA
 				data = HTTP2_Frame_DATA.from frame
 				stream = @streams[data.stream_id]
 				if stream
 					stream.recv_data data
 				else
-					goaway(:PROTOCOL_ERROR, debug_data: "#{data.stream_id}??")
+					goaway(:PROTOCOL_ERROR, debug_data: "DATA on #{data.stream_id} (??)")
 				end
 			when :GOAWAY
 				goaway = HTTP2_Frame_GOAWAY.from frame
@@ -164,18 +190,23 @@ class HTTP2_Connection
 				if stream
 					stream.recv_priority priority
 				else
-					goaway(:PROTOCOL_ERROR, debug_data: "#{priority.stream_id}??")
+					goaway(:PROTOCOL_ERROR, debug_data: "PRIORITY on #{priority.stream_id} (??)")
 				end
 			when :WINDOW_UPDATE
-				#window_update = HTTP2_Frame_WINDOW_UPDATE.from.frame
-				# TODO: do this?
+				window_update = HTTP2_Frame_WINDOW_UPDATE.from frame
+				stream = @streams[window_update.stream_id]
+				if stream
+					stream.recv_window_update window_update
+				else
+					# TODO: do this?
+				end
 			when :RST_STREAM
 				rst_stream = HTTP2_Frame_RST_STREAM.from frame
 				stream = @streams[rst_stream.stream_id]
 				if stream
 					stream.recv_rst_stream rst_stream
 				else
-					goaway(:PROTOCOL_ERROR, debug_data: "#{rst_stream.stream_id}??")
+					goaway(:PROTOCOL_ERROR, debug_data: "RST_STREAM on #{rst_stream.stream_id} (??)")
 				end
 			when :PING
 				ping = HTTP2_Frame_PING.from frame
@@ -185,12 +216,30 @@ class HTTP2_Connection
 					@peer.write ping.pong!
 				end
 			when :ALTSVC
-				#altsvc = HTTP2_Frame_ALTSVC.from frame
-				# TODO: do this?
+				altsvc = HTTP2_Frame_ALTSVC.from frame
+				stream = @streams[altsvc.stream_id]
+				if stream
+					stream.recv_altsvc altsvc
+				else
+					# TODO: do this?
+				end
 			when :PUSH_PROMISE
-				#push_promise = HTTP2_Frame_PUSH_PROMISE.from frame
-				# Nope, don't accept these
-				#goaway( :PROTOCOL_ERROR, debug_data: "peers can't push" )
+				push_promise = HTTP2_Frame_PUSH_PROMISE.from frame
+				stream = @streams[push_promise.stream_id]
+				# FIXME: HPACK!
+				if stream
+					frames = [push_promise]
+					flag = HTTP2_Frame_HEADERS::FLAG_END_HEADERS
+					f = push_promise
+					until f.end_headers?
+						f = recv {|g| (g.type_symbol == :CONTINUATION && (g.flags & flag == flag)) or raise PROTOCOL_ERROR } #XXX
+						raise PROTOCOL_ERROR unless f.stream_id == push_promise.stream_id #XXX
+						frames << HTTP2_Frame_CONTINUATION.from(f)
+					end
+					stream.recv_push_promise *frames
+				else
+					goaway(:PROTOCOL_ERROR, debug_data: "PUSH_PROMISE on #{push_promise.stream_id} (??)")
+				end
 			else
 				goaway( :PROTOCOL_ERROR, debug_data: "invalid frame type #{frame.type.inspect}" )
 			end
