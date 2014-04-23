@@ -12,14 +12,14 @@ class HTTP2_Frame_PRIORITY
 		raise ArgumentError unless f.type_symbol == :PRIORITY
 		raise PROTOCOL_ERROR if f.stream_id == 0
 		pr, payload = PrioritisedFrame.extract_priority_from f
-		raise PROTOCOL_ERROR if payload.bytesize < 0
+		raise PROTOCOL_ERROR if payload.bytesize > 0
 		raise PROTOCOL_ERROR if pr.nil?
-		self.new pr
+		self.new f.stream_id, pr
 	end
 
-	def initialize priority
+	def initialize stream_id, priority
 		self.priority = priority
-		@frame = HTTP2_Frame.new :PRIORITY
+		@frame = HTTP2_Frame.new :PRIORITY, stream_id: stream_id
 		__update_frame
 	end
 
@@ -31,7 +31,7 @@ class HTTP2_Frame_PRIORITY
 
 	def priority= pr
 		case pr
-		when nil, PrioritisedFrame::PriorityGroup, PrioritisedFrame::PriorityDependency
+		when PrioritisedFrame::PriorityGroup, PrioritisedFrame::PriorityDependency
 			@priority = pr
 		else
 			raise ArgumentError

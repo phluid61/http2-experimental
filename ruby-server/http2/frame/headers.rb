@@ -20,18 +20,18 @@ class HTTP2_Frame_HEADERS
 		pad, payload = PaddedFrame.extract_padding_from f
 		pr, payload = PrioritisedFrame.extract_priority_from f, payload: payload
 		raise PROTOCOL_ERROR if payload.bytesize < pad
-		g = self.new payload.byteslice(0,-pad), padding: pad, priority: pr
+		g = self.new f.stream_id, payload.byteslice(0,-pad), padding: pad, priority: pr
 		g.end_stream! if f.flags & FLAG_END_STREAM == FLAG_END_STREAM
 		g.end_segment! if f.flags & FLAG_END_SEGMENT == FLAG_END_SEGMENT
 		g.end_headers! if f.flags & FLAG_END_HEADERS == FLAG_END_HEADERS
 		g
 	end
 
-	def initialize fragment, padding: 0, priority: nil
+	def initialize stream_id, fragment, padding: 0, priority: nil
 		self.fragment = fragment
 		self.padding = padding
 		self.priority = priority
-		@frame = HTTP2_Frame.new :HEADERS
+		@frame = HTTP2_Frame.new :HEADERS, stream_id: stream_id
 		__update_frame
 	end
 
@@ -56,7 +56,7 @@ class HTTP2_Frame_HEADERS
 	def fragment= f
 		f = f.to_s
 		# FIXME: range check here!
-		#raise ArgumentError if f.bytesize != 8
+		#raise ArgumentError if f.bytesize >= 2**14
 		@fragment = f
 		__update_frame if @frame
 	end

@@ -23,7 +23,7 @@ class HTTP2_Frame_SETTINGS
 			buf = f.payload
 			hsh = {}
 			until buf.empty?
-				id, val, buf = buf.unpack 'CL<a*'
+				id, val, buf = buf.unpack 'CL>a*'
 				hsh[id] = val
 			end
 			self.new hsh
@@ -88,7 +88,7 @@ class HTTP2_Frame_SETTINGS
 	def __serialize
 		s = ''
 		@settings.each_pair do |id, v|
-			s << [id, v].pack('CL<')
+			s << [id, v].pack('CL>')
 		end
 		s
 	end
