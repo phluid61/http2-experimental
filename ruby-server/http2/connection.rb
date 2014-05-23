@@ -180,7 +180,7 @@ class HTTP2_Connection
 				goaway = HTTP2_Frame_GOAWAY.from frame
 				err = goaway.error_code
 				err = (HTTP2_Error.symbol_for(err) rescue err)
-				STDERR.print "[#{Time.now}] #{@peer.inspect}: GOAWAY [#{goaway.last_stream_id}] [#{err}]\n"
+				STDERR.print "[#{Time.now}] #{@peer.inspect}: GOAWAY [#{goaway.last_stream_id}] [#{err}] [#{goaway.debug_data.inspect}]\n"
 				# FIXME: be less violent!
 				@peer.close
 				return
