@@ -7,10 +7,10 @@ class HTTP2_Frame_DATA
 
 	FLAG_END_STREAM  = 0x01
 	FLAG_END_SEGMENT = 0x02
-	#~~~~              0x04
+	#~~~~               0x04
 	#FLAG_PAD_LOW     = 0x08
 	#FLAG_PAD_HIGH    = 0x10
-	#FLAG_COMPRESSED  = 0x20
+	FLAG_COMPRESSED  = 0x20
 
 	def self.from f
 		raise ArgumentError unless f.type_symbol == :DATA
@@ -21,6 +21,7 @@ class HTTP2_Frame_DATA
 		g = self.new f.stream_id, payload, padding: pad
 		g.end_stream! if f.flags & FLAG_END_STREAM == FLAG_END_STREAM
 		g.end_segment! if f.flags & FLAG_END_SEGMENT == FLAG_END_SEGMENT
+		g.compressed! if f.flags & FLAG_COMPRESSED == FLAG_COMPRESSED
 		g
 	end
 
@@ -39,6 +40,10 @@ class HTTP2_Frame_DATA
 
 	def end_segment?
 		@frame.flags & FLAG_END_SEGMENT == FLAG_END_SEGMENT
+	end
+
+	def compressed?
+		@frame.flags & FLAG_COMPRESSED == FLAG_COMPRESSED
 	end
 
 	def stream_id
@@ -60,6 +65,11 @@ class HTTP2_Frame_DATA
 
 	def end_segment!
 		@frame.flags |= FLAG_END_SEGMENT
+		self
+	end
+
+	def compressed!
+		@frame.flags |= FLAG_COMPRESSED
 		self
 	end
 
@@ -90,6 +100,7 @@ class HTTP2_Frame_DATA
 		flags, head, tail = PaddedFrame.generate_padding @padding
 		flags |= FLAG_END_STREAM if end_stream?
 		flags |= FLAG_END_SEGMENT if end_segment?
+		flags |= FLAG_COMPRESSED if compressed?
 		@frame.flags = flags
 		@frame.payload = head + @data + tail
 	end
