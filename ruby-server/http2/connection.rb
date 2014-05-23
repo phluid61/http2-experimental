@@ -155,9 +155,9 @@ class HTTP2_Connection
 				if stream
 					frames = [headers]
 					flag = HTTP2_Frame_HEADERS::FLAG_END_HEADERS
-					f = headers
-					until f.end_headers?
-						f = recv {|g| (g.type_symbol == :CONTINUATION && (g.flags & flag == flag)) or raise PROTOCOL_ERROR } #XXX
+					f = frame
+					until f.flags & flag == flag
+						f = recv {|g| p g; (g.type_symbol == :CONTINUATION) or raise PROTOCOL_ERROR } #XXX
 						raise PROTOCOL_ERROR unless f.stream_id == headers.stream_id #XXX
 						frames << HTTP2_Frame_CONTINUATION.from(f)
 					end
@@ -180,7 +180,7 @@ class HTTP2_Connection
 				goaway = HTTP2_Frame_GOAWAY.from frame
 				err = goaway.error_code
 				err = (HTTP2_Error.symbol_for(err) rescue err)
-				STDERR.print "[#{@Time.now}] #{@peer.inspect}: GOAWAY [#{goaway.last_stream_id}] [#{err}]"
+				STDERR.print "[#{Time.now}] #{@peer.inspect}: GOAWAY [#{goaway.last_stream_id}] [#{err}]\n"
 				# FIXME: be less violent!
 				@peer.close
 				return
@@ -265,7 +265,9 @@ class HTTP2_Connection
 				@recv_queue.unshift *buf
 				return f
 			end
+			buf << f
 		end
+		@recv_queue.unshift *buf
 		loop do
 			f = HTTP2_Frame.recv_from @peer
 			if filter.nil? || yield(f)
