@@ -11,8 +11,7 @@ class HTTP2_Frame_HEADERS
 	FLAG_END_HEADERS = 0x04
 	#FLAG_PAD_LOW     = 0x08
 	#FLAG_PAD_HIGH    = 0x10
-	#FLAG_PRIORITY_GROUP      = 0x20
-	#FLAG_PRIORITY_DEPENDENCY = 0x40
+	#FLAG_PRIORITY    = 0x20
 
 	def self.from f
 		raise ArgumentError unless f.type_symbol == :HEADERS
@@ -78,7 +77,7 @@ class HTTP2_Frame_HEADERS
 
 	def priority= pr
 		case pr
-		when nil, PrioritisedFrame::PriorityGroup, PrioritisedFrame::PriorityDependency
+		when nil, PrioritisedFrame::Priority
 			@priority = pr
 		else
 			raise ArgumentError
