@@ -7,15 +7,15 @@ module PrioritisedFrame
 		pg = nil
 		pd = nil
 		if frame.flags & FLAG_PRIORITY_GROUP == FLAG_PRIORITY_GROUP
-			if frame.flags & FLAG_PRIORITY_DEPENDENCY = FLAG_PRIORITY_DEPENDENCY
+			if frame.flags & FLAG_PRIORITY_DEPENDENCY == FLAG_PRIORITY_DEPENDENCY
 				raise PROTOCOL_ERROR
 			end
 			flags |= FLAG_PRIORITY_GROUP
-			[pgi, weight] = payload.unpack('L>C')
+			pgi, weight = payload.unpack('L>C')
 			pg = PriorityGroup.new(pgi&0x7FFF_FFFF, weight+1)
 			payload = payload.byteslice(5,-1)
 		end
-		if frame.flags & FLAG_PRIORITY_DEPENDENCY = FLAG_PRIORITY_DEPENDENCY
+		if frame.flags & FLAG_PRIORITY_DEPENDENCY == FLAG_PRIORITY_DEPENDENCY
 			flags |= FLAG_PRIORITY_DEPENDENCY
 			sd = payload.unpack('L>')
 			pd = PriorityDependency.new(sd & 0x7FFF_FFFF, (sd & 0x8000_0000 == 0x8000_0000))

@@ -20,11 +20,11 @@ class HTTP2_Frame
 		:CONTINUATION, :ALTSVC
 	]
 
-	def self._read bytes
+	def self._read io, bytes
 		result = ''
 		while bytes > 0
 			buf = io.read bytes
-			raise unless buf
+			raise "buffer underrun (expected #{bytes})" unless buf
 			result << buf
 			bytes -= buf.bytesize
 		end
@@ -33,13 +33,13 @@ class HTTP2_Frame
 
 	def self.recv_from io
 		# Read the header
-		packed = self._read 8
+		packed = self._read io, 8
 		length, type, flags, stream_id = packed.unpack 'S>CCL>'
 		length &= 0x3fff
 		stream_id &= 0x7fffffff
 
 		# Read the payload (if any)
-		payload = length > 0 ? self._read(length) : ''
+		payload = length > 0 ? self._read(io, length) : ''
 
 		# Construct an object and return it
 		self.new type, flags: flags, stream_id: stream_id, payload: payload
