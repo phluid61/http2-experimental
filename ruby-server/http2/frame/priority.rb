@@ -5,8 +5,7 @@ require_relative '../error'
 
 class HTTP2_Frame_PRIORITY
 
-	#FLAG_PRIORITY_GROUP      = 0x20
-	#FLAG_PRIORITY_DEPENDENCY = 0x40
+	#FLAG_PRIORITY = 0x20
 
 	def self.from f
 		raise ArgumentError unless f.type_symbol == :PRIORITY
@@ -31,7 +30,7 @@ class HTTP2_Frame_PRIORITY
 
 	def priority= pr
 		case pr
-		when PrioritisedFrame::PriorityGroup, PrioritisedFrame::PriorityDependency
+		when PrioritisedFrame::Priority
 			@priority = pr
 		else
 			raise ArgumentError
