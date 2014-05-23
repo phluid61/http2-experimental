@@ -44,6 +44,8 @@ begin
 	payload = [3,0].pack('L>L>')+"This is the end... beautiful friend"
 	s.write [payload.bytesize,0x7,0,0x0].pack('S>CCL>')+payload
 
+	s.read
+
 rescue Exception => e
 	p e
 	puts e.backtrace.map{|b| "\t#{b}" }
