@@ -19,7 +19,8 @@ class HTTP2_Frame_HEADERS
 		pad, payload = PaddedFrame.extract_padding_from f
 		pr, payload = PrioritisedFrame.extract_priority_from f, payload: payload
 		raise PROTOCOL_ERROR if payload.bytesize < pad
-		g = self.new f.stream_id, payload.byteslice(0,-pad), padding: pad, priority: pr
+		payload = payload.byteslice(0,-pad) if pad > 0
+		g = self.new f.stream_id, payload, padding: pad, priority: pr
 		g.end_stream! if f.flags & FLAG_END_STREAM == FLAG_END_STREAM
 		g.end_segment! if f.flags & FLAG_END_SEGMENT == FLAG_END_SEGMENT
 		g.end_headers! if f.flags & FLAG_END_HEADERS == FLAG_END_HEADERS
@@ -110,7 +111,7 @@ class HTTP2_Frame_HEADERS
 
 	def __update_frame
 		flags, head, tail = PaddedFrame.generate_padding @padding
-		flags, head = PrioritisedFrame.generate_priority @priority, flags: flags, head: head
+		flags, head = PrioritisedFrame.generate_priority @priority, flags: flags, body: head
 		flags |= FLAG_END_STREAM if end_stream?
 		flags |= FLAG_END_SEGMENT if end_segment?
 		flags |= FLAG_END_HEADERS if end_headers?
