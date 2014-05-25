@@ -1,3 +1,4 @@
+# Encoding: ascii-8bit
 
 require 'hashmap'
 require_relative 'core'
@@ -20,6 +21,19 @@ class HPACK_Context
 		end
 	end
 
+	#
+	# @param String name
+	# @param String value
+	# @param index: true=index, nil=don't index, false=never index
+	#
+	def send name, value, index: true
+		if index
+			i = @header_table.find(name, value)
+			return send_index(i) if i
+		end
+		send_literal name, value, index: index
+	end
+
 	def send_index i
 		HPACK.encode_int i, prefix_bits: 7, prefix: INDEXED_BIT
 	end
@@ -38,6 +52,8 @@ class HPACK_Context
 	end
 
 	#
+	# FIXME: should this add anything to a table?
+	#
 	# @param String name
 	# @param String value
 	# @param index: true=index, nil=don't index, false=never index
@@ -53,7 +69,7 @@ class HPACK_Context
 			p = LITERAL_NOINDEX_BIT
 			b = 4
 		end
-		i = @header_table.find(name)
+		i = @header_table.find_name(name)
 		if i
 			bytes = HPACK.encode_int i, prefix_bits: b, prefix: p
 		else
@@ -62,7 +78,7 @@ class HPACK_Context
 		end
 		bytes << HPACK.encode_string(value)
 	end
-	# TODO: the recv that invokes this
+	# TODO: the recv that invokes this (and possibly pulls the name out of the table)
 	def recv_literal name, value, index: true
 		e = HeaderTable::Entry.new name, value
 		if index
@@ -168,9 +184,16 @@ class HPACK_Context
 		end
 		private :__evict
 
-		def find name
+		def find_name name
 			name = name.downcase
-			@table.find_index {|e| e.name.downcase == name }
+			idx = @table.find_index {|e| e.name.downcase == name }
+			idx or StaticTable.find_index {|e| e.name == name }
+		end
+
+		def find name, value
+			name = name.downcase
+			idx = @table.find_index {|e| e.name.downcase == name && e.value == value }
+			idx or StaticTable.find_index {|e| e.name == name && e.value == value }
 		end
 
 		def [] i
