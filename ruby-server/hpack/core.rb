@@ -3,11 +3,6 @@ module HPACK
 
 	HUFFMAN_BIT = 0x80
 
-	INDEXED_BIT         = 0x80
-	LITERAL_INDEXED_BIT = 0x40
-	CONTEXT_UPDATE_BIT  = 0x20
-	LITERAL_NOINDEX_BIT = 0x10
-
 	#
 	# Returns one or more bytes encoding the integer +i+.
 	#
