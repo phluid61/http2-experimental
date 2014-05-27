@@ -1,0 +1,26 @@
+ruby 2.1.1p76 (2014-02-24 revision 45161) [x86_64-linux]
+
+quads = bytes that encode to 4 bits
+octas = bytes that encode to 8 bits
+shorts = bytes that encode to <= 8 bits
+longs  = bytes that encode to >8 bits
+
+10 strings per category
+15 bytes per string
+10000 iterations
+
+                    user     system      total        real
+Encode quads    0.530000   0.000000   0.530000 (  0.526861)
+Encode octas    0.710000   0.000000   0.710000 (  0.707714)
+Encode shorts   0.650000   0.000000   0.650000 (  0.646679)
+Encode longs    1.400000   0.000000   1.400000 (  1.402837)
+Decode quads    1.890000   0.000000   1.890000 (  1.891725)
+Decode octas    3.400000   0.000000   3.400000 (  3.399005)
+Decode shorts   2.870000   0.000000   2.870000 (  2.873090)
+Decode longs    8.880000   0.000000   8.880000 (  8.890222)
+
+Random permutation of all 256 bytes
+
+                       user     system      total        real
+Encode all bytes   1.880000   0.010000   1.890000 (  1.874852)
+Decode all bytes  12.090000   0.000000  12.090000 ( 12.096341)
