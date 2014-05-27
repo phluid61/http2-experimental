@@ -4,9 +4,9 @@ require 'minitest/autorun'
 require 'minitest/unit'
 $VERBOSE = true
 
-require_relative 'hpack'
+require_relative 'hpack/core'
 
-class Test_hpack < MiniTest::Test
+class Test_hpack < MiniTest::Unit::TestCase
 
 	def test_encode_int
 		[
@@ -47,6 +47,22 @@ class Test_hpack < MiniTest::Test
 		end
 	end
 
+	def test_encode_intX
+		[
+			[-1, 8, 0], # i < 0
+			[1, 0, 0],  # prefix bits < 0
+			[1, 9, 0],  # prefix bits > 8
+			[1, 8, -1], # prefix < 0x00
+			[1, 8, 0x100], # prefix > 0xFF
+			[1, 8, ""],   # prefix not 1 byte
+			[1, 8, "XX"], # prefix not 1 byte
+			[1, 8, self], # prefix not Integer|String|NilClass
+			[1, 4, 0xFF], # prefix sets masked bits
+		].each do |i, b, p|
+			assert_raises(ArgumentError) { HPACK.encode_int(i, prefix_bits: b, prefix: p) }
+		end
+	end
+
 	def test_decode_int
 		[
 			[["\x00", 0x00, ''], "\x00"],
@@ -80,11 +96,60 @@ class Test_hpack < MiniTest::Test
 		end
 	end
 
+	def test_decode_intX
+		[
+			['', 8], # no bytes
+			["\x00", -1], # prefix bits < 0
+			["\x00", 9], # prefix bits > 8
+		].each do |b, p|
+			assert_raises(ArgumentError) { HPACK.decode_int(b, prefix_bits: p) }
+		end
+	end
+
+	def test_huffman_code_for
+		[
+			['', ''],
+			[';', "\xEC"],
+			['3', 'G'],
+			['33', 'B?'],
+			['1020', "\x10\x20"],
+			["\xA3", "\xFF\xFF\xFF\xFF"],
+			['www.example.com', "\xE7\xCF\x9B\xEB\xE8\x9B\x6F\xB1\x6F\xA9\xB6\xFF"],
+			['/.well-known/host-meta', "\x3B\xFC\xD7\x65\x99\xBD\xAE\x6F\x3B\x8F\x5B\x71\x76\x6B\x56\xE4\xFF"],
+		].each do |s, x|
+			assert_equal( x, HPACK.huffman_code_for(s) )
+		end
+	end
+
+	def test_string_from
+		[
+			['', ''],
+			[';', "\xEC"],
+			['3', 'G'],
+			['33', 'B?'],
+			['1020', "\x10\x20"],
+			["\xA3", "\xFF\xFF\xFF\xFF"],
+			['www.example.com', "\xE7\xCF\x9B\xEB\xE8\x9B\x6F\xB1\x6F\xA9\xB6\xFF"],
+			['/.well-known/host-meta', "\x3B\xFC\xD7\x65\x99\xBD\xAE\x6F\x3B\x8F\x5B\x71\x76\x6B\x56\xE4\xFF"],
+		].each do |x, h|
+			assert_equal( x, HPACK.string_from(h) )
+		end
+	end
+
+	def test_string_fromX
+		[
+			"\xE0", # \xE1 would be 'f', but wrong padding
+			"\xFF\xFF\xEE\x7F", # Valid encoding of EOS
+		].each do |h|
+			assert_raises(RuntimeError, "#{h.inspect} should be invalid") { HPACK.string_from(h) }
+		end
+	end
+
 	def test_encode_string
-		foo = 'foo'*86
+		foo = '<?>'*86
 		[
 			['', "\x00"],
-			['Hello', "\x05Hello"],
+			['Hello', "\x84\xF9\x2E\xCB\x1B"],
 			[foo, "\x7F\x83\x01#{foo}"],
 		].each do |s, x|
 			assert_equal( x, HPACK.encode_string(s) )
@@ -96,11 +161,21 @@ class Test_hpack < MiniTest::Test
 		[
 			[['', ''], "\x00"],
 			[['Hello', ''], "\x05Hello"],
+			[['Hello', ''], "\x84\xF9\x2E\xCB\x1B"],
 			[[foo, ''], "\x7F\x83\x01#{foo}"],
 			[['', 'bar'], "\x00bar"],
 			[[foo, 'bar'], "\x7F\x83\x01#{foo}bar"],
 		].each do |x, b|
 			assert_equal( x, HPACK.decode_string(b) )
+		end
+	end
+
+	def test_decode_stringX
+		[
+			'', # no bytes
+			"\x01", # not enough bytes
+		].each do |b|
+			assert_raises(ArgumentError) { HPACK.decode_string(b) }
 		end
 	end
 
