@@ -275,4 +275,6 @@ module HPACK
 		151]],[[152,153],[154,155]]],[[[156,157],[158,159]],[[160,161],
 		[162,163]]]]]]]]]]]]]]]]]]]]]]]]]]
 
+	private_constant :HuffmanCodes, :HuffmanDecodes
+
 end
