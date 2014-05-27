@@ -85,7 +85,7 @@ module HPACK
 	# Reads a length-encoded string literal from the start
 	# of a sequence of bytes.
 	#
-	# Doesn't handle Huffman coding (yet?).
+	# Decodes Huffman coded strings.
 	#
 	# @return [String str, String rest]
 	#
@@ -93,6 +93,7 @@ module HPACK
 		bytes = bytes.to_s unless bytes.is_a? String
 		raise ArgumentError if bytes.empty?
 		prefix, length, bytes = self.decode_int bytes, prefix_bits: 7
+		raise ArgumentError if bytes.bytesize < length
 		string = ''
 		if length > 0
 			string = bytes.byteslice(0, length)
@@ -141,6 +142,7 @@ module HPACK
 	# @throws RuntimeError if the code is invalid
 	#
 	def self.string_from huff
+		return '' if huff.bytesize == 0
 		bytes = huff.unpack('C*')
 		str = []
 		tc = HuffmanDecodes
