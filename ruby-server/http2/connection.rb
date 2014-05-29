@@ -157,7 +157,7 @@ class HTTP2_Connection
 					flag = HTTP2_Frame_HEADERS::FLAG_END_HEADERS
 					f = frame
 					until f.flags & flag == flag
-						f = recv {|g| p g; (g.type_symbol == :CONTINUATION) or raise PROTOCOL_ERROR } #XXX
+						f = recv {|g| (g.type_symbol == :CONTINUATION) or raise PROTOCOL_ERROR } #XXX
 						raise PROTOCOL_ERROR unless f.stream_id == headers.stream_id #XXX
 						frames << HTTP2_Frame_CONTINUATION.from(f)
 					end
