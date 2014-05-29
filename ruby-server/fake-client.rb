@@ -1,3 +1,4 @@
+# Encoding: ascii-8bit
 
 require 'socket'
 
@@ -28,16 +29,17 @@ begin
 	s.write [0,0x4,0x1,0].pack('S>CCL>')
 
 	# 2. get /
-	payload = ":method:get\x0D\x0A:path:/"
+	authority = 'www.example.com'
+	payload = [0x82, 0x85, 0b01000000|3, authority.bytesize].pack('CCCC') + authority
 	s.write [payload.bytesize,0x1,0x1|0x4,1].pack('S>CCL>')+payload
 
 	# 3. post / foo
-	payload = ":method:post\x0D\x0A:path:/"
+	payload = [0x83,0x86].pack('CC')
 	s.write [payload.bytesize,0x1,0x4,3].pack('S>CCL>')+payload
 	payload = "foo"
 	s.write [payload.bytesize,0x0,0x1,3].pack('S>CCL>')+payload
 
-	# 4. ping rofl*
+	# 4. ping *
 	payload = "deadbeef"
 	s.write [payload.bytesize,0x6,0x0,0].pack('S>CCL>')+payload
 

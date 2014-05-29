@@ -24,7 +24,7 @@ class HTTP2_Stream
 		@local
 	end
 
-	def recv_headers f, *cs
+	def recv_headers block, f, *cs
 		case @state
 		when :idle, :open
 			@state = (f.end_stream? ? :half_closed_remote : :open)
@@ -34,24 +34,26 @@ class HTTP2_Stream
 		else
 			raise PROTOCOL_ERROR
 		end
-		@headers_recvd << f.fragment
-		cs.each do |c|
-			@headers_recvd << c.fragment
-		end
+		#@headers_recvd << f.fragment
+		#cs.each do |c|
+		#	@headers_recvd << c.fragment
+		#end
+		@headers_recvd << block.map(&:to_s).join("\r\n")
 		emit_message if f.end_segment? || f.end_stream?
 	end
 
-	def recv_push_promise f, *cs
+	def recv_push_promise block, f, *cs
 		case @state
 		when :idle
 			@state = :reserved_remote
 		else
 			raise PROTOCOL_ERROR
 		end
-		@headers_recvd << f.fragment
-		cs.each do |c|
-			@headers_recvd << c.fragment
-		end
+		#@headers_recvd << f.fragment
+		#cs.each do |c|
+		#	@headers_recvd << c.fragment
+		#end
+		@headers_recvd << block.map(&:to_s).join("\r\n")
 		emit_pp # warn the API that there's a PP incoming
 	end
 

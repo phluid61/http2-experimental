@@ -52,7 +52,8 @@ class HTTP2_Frame_SETTINGS
 	end
 	alias :[]= :set
 
-	private	def __set id, v
+#	private	def __set id, v
+	def __set id, v
 		case id
 		when :SETTINGS_HEADER_TABLE_SIZE, :HEADER_TABLE_SIZE, 1
 			id = 1
