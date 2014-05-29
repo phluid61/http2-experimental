@@ -77,6 +77,7 @@ class HTTP2_Frame_SETTINGS
 
 		@settings[id] = v
 	end
+	private :__set
 
 	def each &blk
 		@settings.each_pair{|k,v| yield (PARAMETERS[k] || k), v }
