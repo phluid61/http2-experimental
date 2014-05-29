@@ -1,4 +1,5 @@
 
+require_relative '../hpack'
 require_relative 'frame'
 require_relative 'stream'
 require_relative 'error'
@@ -37,6 +38,8 @@ class HTTP2_Connection
 		@recv_queue = []
 
 		# Actual HTTP stuff
+		@hpack_in  = HPACK_Context.new
+		@hpack_out = HPACK_Context.new
 		@streams = {}
 		@max_sid = 0
 	end
@@ -46,6 +49,7 @@ class HTTP2_Connection
 
 	def header_table_size= s
 		# FIXME: validate
+		#@hpack_out.resize_table s
 		@header_table_size = s
 		#send_settings if @started
 	end
@@ -127,6 +131,7 @@ class HTTP2_Connection
 				settings.each do |k, v|
 					case k
 					when :SETTINGS_HEADER_TABLE_SIZE
+						#@hpack_in.resize_table v
 						@peer_header_table_size = v
 					when :SETTINGS_ENABLE_PUSH
 						@peer_enable_push = (v != 0) #XXX not strictly correct
@@ -151,17 +156,19 @@ class HTTP2_Connection
 					@streams[headers.stream_id] = HTTP2_Stream.new(headers.stream_id, self)
 				end
 				stream = @streams[headers.stream_id]
-				# FIXME: HPACK!
 				if stream
+					@hpack_in.begin_block
+					@hpack_in.recv headers.fragment
 					frames = [headers]
-					flag = HTTP2_Frame_HEADERS::FLAG_END_HEADERS
-					f = frame
-					until f.flags & flag == flag
+					hf = headers
+					until hf.end_headers?
 						f = recv {|g| (g.type_symbol == :CONTINUATION) or raise PROTOCOL_ERROR } #XXX
-						raise PROTOCOL_ERROR unless f.stream_id == headers.stream_id #XXX
-						frames << HTTP2_Frame_CONTINUATION.from(f)
+						raise PROTOCOL_ERROR unless f.stream_id == hf.stream_id #XXX
+						hf = HTTP2_Frame_CONTINUATION.from(f)
+						@hpack_in.recv hf.fragment
+						frames << hf
 					end
-					stream.recv_headers *frames
+					stream.recv_headers @hpack_in.block, *frames
 				else
 					goaway(:PROTOCOL_ERROR, debug_data: "HEADERS on #{headers.stream_id} (?? < #{@max_sid})")
 				end
@@ -226,17 +233,19 @@ class HTTP2_Connection
 			when :PUSH_PROMISE
 				push_promise = HTTP2_Frame_PUSH_PROMISE.from frame
 				stream = @streams[push_promise.stream_id]
-				# FIXME: HPACK!
 				if stream
+					@hpack_in.begin_block
+					@hpack_in.recv push_promise.fragment
 					frames = [push_promise]
-					flag = HTTP2_Frame_HEADERS::FLAG_END_HEADERS
-					f = push_promise
-					until f.end_headers?
-						f = recv {|g| (g.type_symbol == :CONTINUATION && (g.flags & flag == flag)) or raise PROTOCOL_ERROR } #XXX
-						raise PROTOCOL_ERROR unless f.stream_id == push_promise.stream_id #XXX
-						frames << HTTP2_Frame_CONTINUATION.from(f)
+					hf = push_promise
+					until hf.end_headers?
+						f = recv {|g| (g.type_symbol == :CONTINUATION) or raise PROTOCOL_ERROR } #XXX
+						raise PROTOCOL_ERROR unless f.stream_id == hf.stream_id #XXX
+						hf = HTTP2_Frame_CONTINUATION.from(f)
+						@hpack_in.recv push_promise.fragment
+						frames << hf
 					end
-					stream.recv_push_promise *frames
+					stream.recv_push_promise @hpack_in.block, *frames
 				else
 					goaway(:PROTOCOL_ERROR, debug_data: "PUSH_PROMISE on #{push_promise.stream_id} (??)")
 				end

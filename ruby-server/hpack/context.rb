@@ -19,36 +19,103 @@ class HPACK_Context
 		@header_table = HeaderTable.new(max) do |e|
 			@reference_set.drop e
 		end
+		@block = []
 	end
 
 	#
-	# @param String name
-	# @param String value
-	# @param index: true=index, nil=don't index, false=never index
+	# Begin a new header block.
 	#
-	def send name, value, index: true
-		if index
-			i = @header_table.find(name, value)
-			return send_index(i) if i
+	def begin_block
+		@block = []
+		self
+	end
+
+	#
+	# Get the current header block.
+	#
+	def block
+		(@block + @reference_set.to_a).uniq
+	end
+
+	#
+	# Receive bytes from the wire.
+	#
+	def recv bytes
+		bytes = bytes.to_s
+		while bytes.bytesize > 0
+			b = bytes.unpack('C').first
+			if b & INDEXED_BIT == INDEXED_BIT
+				_, idx, bytes = HPACK.decode_int bytes, prefix_bits: 7
+				recv_index idx
+			elsif b & LITERAL_INDEXED_BIT == LITERAL_INDEXED_BIT
+				name, value, bytes = _recv_indexed bytes, 6
+				recv_literal name, value
+			elsif b & CONTEXT_UPDATE_BIT == CONTEXT_UPDATE_BIT
+				_, max, bytes = HPACK.decode_int bytes, 4
+				if b & FLUSH_REFSET == FLUSH_REFSET
+					raise "Invalid FLUSH_REFSET (rest=#{max}, expected 0)" if max != 0
+					flush_reference_set
+				else # RESIZE_TABLE
+					resize_table max
+				end
+			elsif b & LITERAL_NOINDEX_BIT == LITERAL_NOINDEX_BIT
+				name, value, bytes = _recv_indexed bytes, 4
+				recv_literal name, value, index: false
+			else
+				name, value, bytes = _recv_indexed bytes, 4
+				recv_literal name, value, index: nil
+			end
 		end
-		send_literal name, value, index: index
+		self
+	end
+	def _recv_indexed bytes, prefix
+		_, idx, bytes = HPACK.decode_int bytes, prefix_bits: prefix
+		if idx == 0
+			name, bytes = HPACK.decode_string bytes
+		else
+			name = @header_table[idx].name
+		end
+		value, bytes = HPACK.decode_string bytes
+		[name, value, bytes]
 	end
 
-	def send_index i
-		HPACK.encode_int i, prefix_bits: 7, prefix: INDEXED_BIT
-	end
-	# TODO: the recv that invokes this
 	def recv_index i
 		e = @header_table[i]
 		if !@reference_set.drop(e)
 			if i > @header_table.length
 				idx = @header_table.add_entry e
-				@reference_set << @header_table[idx] if idx
+				@reference_set << e if idx
 			else
-				@reference_set << @header_table[i]
+				@reference_set << e
 			end
+			@block << e
 			e
 		end
+	end
+
+	def recv_literal name, value, index: true
+		e = HeaderTable::Entry.new name, value
+		if index
+			idx = @header_table.add_entry e
+			@reference_set << e if idx
+		end
+		@block << e
+		e
+	end
+
+	#
+	# FIXME: should this add anything to a table?
+	#
+	# @param String name
+	# @param String value if nil, just drop the name
+	#
+	def drop name, value=nil
+		if value
+			i = @header_table.find(name, value)
+		else
+			i = @header_table.find_name name
+		end
+		HPACK.encode_int(i, prefix_bits: 7, prefix: INDEXED_BIT) if i
 	end
 
 	#
@@ -58,7 +125,7 @@ class HPACK_Context
 	# @param String value
 	# @param index: true=index, nil=don't index, false=never index
 	#
-	def send_literal name, value, index: true
+	def send name, value, index: true
 		if index
 			p = LITERAL_INDEXED_BIT
 			b = 6
@@ -78,21 +145,6 @@ class HPACK_Context
 		end
 		bytes << HPACK.encode_string(value)
 	end
-	# TODO: the recv that invokes this (and possibly pulls the name out of the table)
-	def recv_literal name, value, index: true
-		e = HeaderTable::Entry.new name, value
-		if index
-			idx = @header_table.add_entry e
-			if idx
-				@reference_set << @header_table[i]
-			end
-		end
-		e
-	end
-
-	def reference_set &block
-		@reference_set.each &block
-	end
 
 	def flush_reference_set
 		@reference_set.flush
@@ -105,6 +157,7 @@ class HPACK_Context
 	end
 
 	class ReferenceSet
+		include Enumerable
 		def initialize
 			@refs = {}
 		end
@@ -131,6 +184,13 @@ class HPACK_Context
 				@size = @name.bytesize + @value.bytesize + 32
 			end
 			attr_reader :name, :value, :size
+			def to_s
+				if @name.downcase == 'cookie'
+					"#{@name}: #{@value.gsub "\0", '; '}"
+				else
+					"#{@name}: #{@value}"
+				end
+			end
 		end
 
 		def initialize max=4096, &on_evict
@@ -166,7 +226,7 @@ class HPACK_Context
 		# @return the index of the new entry, or nil if it's too big.
 		#
 		def add_entry e
-			_evict( @max - e.size )
+			__evict( @max - e.size )
 			if e.size < @max
 				@table.unshift e
 				@size += e.size
