@@ -62,7 +62,3 @@ end
 
 class PROTOCOL_ERROR < RuntimeError
 end
-
-class PROTOCOL_ERROR < RuntimeError
-end
-
