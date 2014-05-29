@@ -15,8 +15,6 @@ class HTTP2_Frame_CONTINUATION
 		pad, payload = PaddedFrame.extract_padding_from f
 		raise PROTOCOL_ERROR if payload.bytesize < pad
 		g = self.new f.stream_id, payload.byteslice(0,-pad), padding: pad
-		g.end_stream! if f.flags & FLAG_END_STREAM == FLAG_END_STREAM
-		g.end_segment! if f.flags & FLAG_END_SEGMENT == FLAG_END_SEGMENT
 		g.end_headers! if f.flags & FLAG_END_HEADERS == FLAG_END_HEADERS
 		g
 	end
