@@ -32,7 +32,7 @@ class HTTP2_Server
 					# Nope, don't accept these
 					conn.goaway( :PROTOCOL_ERROR, debug_data: "clients can't push" )
 				end
-				conn.start
+				conn.start_server
 			end
 		}
 	end
