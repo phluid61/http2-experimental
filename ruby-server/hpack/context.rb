@@ -20,6 +20,7 @@ class HPACK_Context
 			@reference_set.drop e
 		end
 		@block = []
+		@bytes = ''
 	end
 
 	#
@@ -51,7 +52,7 @@ class HPACK_Context
 				name, value, bytes = _recv_indexed bytes, 6
 				recv_literal name, value
 			elsif b & CONTEXT_UPDATE_BIT == CONTEXT_UPDATE_BIT
-				_, max, bytes = HPACK.decode_int bytes, 4
+				_, max, bytes = HPACK.decode_int bytes, prefix_bits: 4
 				if b & FLUSH_REFSET == FLUSH_REFSET
 					raise "Invalid FLUSH_REFSET (rest=#{max}, expected 0)" if max != 0
 					flush_reference_set
@@ -104,6 +105,21 @@ class HPACK_Context
 	end
 
 	#
+	# Begin a new header block.
+	#
+	def begin_bytes
+		@bytes = ''
+		self
+	end
+
+	#
+	# Get the current header block.
+	#
+	def bytes
+		@bytes.dup
+	end
+
+	#
 	# FIXME: should this add anything to a table?
 	#
 	# @param String name
@@ -115,7 +131,11 @@ class HPACK_Context
 		else
 			i = @header_table.find_name name
 		end
-		HPACK.encode_int(i, prefix_bits: 7, prefix: INDEXED_BIT) if i
+		raise "no such item in header table" unless i
+		e = @reference_set.drop(@header_table[i])
+		raise "no such item in reference set" unless e
+		@bytes << HPACK.encode_int(i, prefix_bits: 7, prefix: INDEXED_BIT) if i
+		self
 	end
 
 	#
@@ -124,36 +144,55 @@ class HPACK_Context
 	# @param String name
 	# @param String value
 	# @param index: true=index, nil=don't index, false=never index
+	# @return bytes to pack into a HEADERS payload
 	#
 	def send name, value, index: true
-		if index
-			p = LITERAL_INDEXED_BIT
-			b = 6
-		elsif index.nil?
-			p = 0
-			b = 4
+		if index && (i = @header_table.find(name, value)) && (e = @header_table[i]) && !@reference_set.include?(e)
+			@reference_set << e
+			@bytes << HPACK.encode_int(i, prefix_bits: 7, prefix: INDEXED_BIT)
 		else
-			p = LITERAL_NOINDEX_BIT
-			b = 4
+			e = HeaderTable::Entry.new name, value
+			if index
+				p = LITERAL_INDEXED_BIT
+				b = 6
+			elsif index.nil?
+				p = 0
+				b = 4
+			else
+				p = LITERAL_NOINDEX_BIT
+				b = 4
+			end
+			i = @header_table.find_name(name)
+			if i
+				@bytes << HPACK.encode_int(i, prefix_bits: b, prefix: p)
+			else
+				@bytes << [p].pack('C') << HPACK.encode_string(name)
+			end
+			if index
+				idx = @header_table.add_entry e
+				@reference_set << e if idx
+			end
+			@bytes << HPACK.encode_string(value)
 		end
-		i = @header_table.find_name(name)
-		if i
-			bytes = HPACK.encode_int i, prefix_bits: b, prefix: p
-		else
-			bytes = [p].pack('C')
-			bytes << HPACK.encode_string(name)
-		end
-		bytes << HPACK.encode_string(value)
+		self
 	end
 
+	#
+	# @return bytes to pack into a HEADERS payload
+	#
 	def flush_reference_set
 		@reference_set.flush
-		[FLUSH_REFSET].pack('C')
+		@bytes << [FLUSH_REFSET].pack('C')
+		self
 	end
 
+	#
+	# @return bytes to pack into a HEADERS payload
+	#
 	def resize_table max
 		@header_table.max = max
-		HPACK.encode_int max, prefix_bits: 4, prefix: RESIZE_TABLE
+		@bytes << HPACK.encode_int(max, prefix_bits: 4, prefix: RESIZE_TABLE)
+		self
 	end
 
 	class ReferenceSet
@@ -164,6 +203,9 @@ class HPACK_Context
 		def << e
 			@refs[e] = e if e
 			self
+		end
+		def include? e
+			@refs[e]
 		end
 		def drop e
 			@refs.delete e
@@ -249,12 +291,14 @@ class HPACK_Context
 			name = name.downcase
 			idx = @table.find_index {|e| e.name.downcase == name }
 			idx or StaticTable.find_index {|e| e.name == name }
+			idx and idx+1
 		end
 
 		def find name, value
 			name = name.downcase
 			idx = @table.find_index {|e| e.name.downcase == name && e.value == value }
 			idx or StaticTable.find_index {|e| e.name == name && e.value == value }
+			idx and idx+1
 		end
 
 		def [] i
