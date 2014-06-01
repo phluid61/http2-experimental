@@ -197,7 +197,7 @@ class HPACK_Context
 			@max = max
 			@table = []
 			@size = 0
-			@on_evit = on_evict
+			@on_evict = on_evict
 		end
 		attr_reader :max, :size
 
@@ -236,10 +236,11 @@ class HPACK_Context
 
 		def __evict max=nil
 			max ||= @max
+			max = 0 if max < 0
 			while @size > max
 				e = @table.pop
 				@size -= e.size
-				@on_evict.call(e)
+				@on_evict.call(e) if @on_evict
 			end
 		end
 		private :__evict
