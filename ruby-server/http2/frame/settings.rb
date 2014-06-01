@@ -36,6 +36,10 @@ class HTTP2_Frame_SETTINGS
 		@frame = HTTP2_Frame.new :SETTINGS, payload: __serialize
 	end
 
+	def ack?
+		false
+	end
+
 	def settings
 		@settings.dup
 	end
