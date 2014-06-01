@@ -14,7 +14,7 @@ class HTTP2_Stream
 		@state = :idle
 		@accept_continuation = false
 
-		@headers_recvd = ''
+		@headers_recvd = []
 		@data_recvd = ''
 	end
 
@@ -38,7 +38,8 @@ class HTTP2_Stream
 		#cs.each do |c|
 		#	@headers_recvd << c.fragment
 		#end
-		@headers_recvd << block.map(&:to_s).join("\r\n")
+		#@headers_recvd << block.map(&:to_s).join("\r\n")
+		@headers_recvd += block
 		emit_message if f.end_segment? || f.end_stream?
 	end
 
@@ -53,7 +54,8 @@ class HTTP2_Stream
 		#cs.each do |c|
 		#	@headers_recvd << c.fragment
 		#end
-		@headers_recvd << block.map(&:to_s).join("\r\n")
+		#@headers_recvd << block.map(&:to_s).join("\r\n")
+		@headers_recvd += block
 		emit_pp # warn the API that there's a PP incoming
 	end
 

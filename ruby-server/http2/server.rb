@@ -23,7 +23,11 @@ class HTTP2_Server
 				conn.max_concurrent_streams = $MAX_CONCURRENT_STREAMS
 				conn.on_message do |stream, headers, data|
 					# TODO!
-					puts ">> #{stream} #{headers.inspect} #{data.inspect}"
+					puts ">> #{stream}:"
+					headers.each do |e|
+						puts "    #{e}"
+					end
+					puts '', data.inspect
 				end
 				conn.on_pp do |stream, headers|
 					# Nope, don't accept these
