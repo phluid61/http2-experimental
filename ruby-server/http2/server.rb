@@ -9,7 +9,6 @@ class HTTP2_Server
 	def initialize port
 		@port = port
 		@header_table_size = 4096
-		@enable_push
 	end
 
 	def start
