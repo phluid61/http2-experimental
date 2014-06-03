@@ -36,8 +36,6 @@ class HTTP2_Client
 		end
 		Thread.abort_on_exception = true
 		t = conn.start_client
-p t
-sleep 1
 
 		conn.begin_headers(2, end_stream: true) do |out|
 			out.send ':method', 'GET'
@@ -59,8 +57,6 @@ sleep 1
 
 		conn.goaway :NO_ERROR, debug_data: 'This is the end... beautiful friend'
 
-		sleep 5
-p t
 		t.join
 	end
 
