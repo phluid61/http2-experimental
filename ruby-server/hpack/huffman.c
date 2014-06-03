@@ -2,7 +2,6 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#define HUFFMAN_DECODE_COUNT = 256;
 uint32_t HuffmanDecodes[] = {
 	65538,
 	196612,
@@ -319,7 +318,7 @@ size_t huffman_decode(uint8_t *huff, size_t bytesize, uint8_t *buff, size_t n) {
 				}
 			} else {
 				/*tmp = VALUE_OF(tmp);*/
-				/* FIXME: assert(tmp < HUFFMAN_DECODE_COUNT) */
+				/* FIXME: assert(tmp < 256) */
 				tc = HuffmanDecodes[tmp];
 			}
 			bc >>= 1;
