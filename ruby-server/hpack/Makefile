@@ -1,20 +1,57 @@
+.SUFFIXES:
 CC=/usr/bin/gcc
-COPTS=-Wall
+CFLAGS=-Wall
 
-OBJS=huffman.o
-HEADERS=huffman.h
-TARGET=test
-SRC=$(TARGET).c
+NAMES := huffman
 
-$(TARGET): $(SRC) $(HEADERS) $(OBJS)
-	$(CC) $(COPTS) $< $(OBJS) -o $@
+OBJS := $(addsuffix .o,$(NAMES))
+HEADERS := $(addsuffix .h,$(NAMES))
+TESTS := $(addprefix test-,$(NAMES))
+TEST_OBJS := $(addsuffix .o,$(TESTS))
 
-.PHONY: run
-run: $(TARGET)
-	./$(TARGET)
-	@echo "$$? test failures"
+#
+# General rules
+#
+
+.PHONY: all
+all: objs tests
+
+.PHONY: objs
+objs: $(OBJS)
+
+.PHONY: tests
+tests: $(TESTS)
+
+.PHONY: test
+test: tests
+	@$(foreach t,$(TESTS),./$(t); )echo "$$? test failures"
+
+#
+# Test programs
+#
+
+define TEST_rules
+$(1).o: $(1).c $$(HEADERS)
+	$$(CC) $$(CFLAGS) -c $$< -o $$@
+
+$(1): $(1).o $$(OBJS)
+	$$(CC) $$(CFLAGS) $$< $$(OBJS) -o $$@
+endef
+$(foreach prog,$(TESTS),$(eval $(call TEST_rules,$(prog))))
+
+#
+# Objects
+#
+
+%.o: %.c %.h
+	$(CC) $(CFLAGS) -c $< -o $@
+
+
+#
+# Housekeeping
+#
 
 .PHONY: clean
 clean:
-	rm -r $(TARGET) $(OBJS)
+	-rm $(TESTS) $(TEST_OBJS) $(OBJS)
 
