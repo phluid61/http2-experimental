@@ -2,12 +2,17 @@
 CC=/usr/bin/gcc
 CFLAGS=-Wall
 
+# Names of target libraries
 NAMES := huffman
 
-OBJS := $(addsuffix .o,$(NAMES))
-HEADERS := $(addsuffix .h,$(NAMES))
+# Headers & Objects for using target libraries
+huffman_HEADERS = huffman.h
+huffman_OBJECTS = huffman.o
+
+# Handy rule targets
+OBJECTS := $(addsuffix .o,$(NAMES))
 TESTS := $(addprefix test-,$(NAMES))
-TEST_OBJS := $(addsuffix .o,$(TESTS))
+TEST_OBJECTS := $(addsuffix .o,$(TESTS))
 
 #
 # General rules
@@ -17,27 +22,28 @@ TEST_OBJS := $(addsuffix .o,$(TESTS))
 all: objs tests
 
 .PHONY: objs
-objs: $(OBJS)
+objs: $(OBJECTS)
 
 .PHONY: tests
 tests: $(TESTS)
 
 .PHONY: test
 test: tests
-	@$(foreach t,$(TESTS),./$(t); )echo "$$? test failures"
+	@$(foreach t,$(TESTS),echo "$(t)"; ./$(t); echo "$$? test failures";) echo "Done"
 
 #
 # Test programs
 #
 
 define TEST_rules
-$(1).o: $(1).c $$(HEADERS)
+$(1).o: $(1).c $$($(1)_HEADERS)
 	$$(CC) $$(CFLAGS) -c $$< -o $$@
 
-$(1): $(1).o $$(OBJS)
-	$$(CC) $$(CFLAGS) $$< $$(OBJS) -o $$@
+$(1): $(1).o $$($(1)_OBJECS)
+	$$(CC) $$(CFLAGS) $$< $$($(1)_OBJECTS) -o $$@
 endef
 $(foreach prog,$(TESTS),$(eval $(call TEST_rules,$(prog))))
+
 
 #
 # Objects
@@ -53,5 +59,5 @@ $(foreach prog,$(TESTS),$(eval $(call TEST_rules,$(prog))))
 
 .PHONY: clean
 clean:
-	-rm $(TESTS) $(TEST_OBJS) $(OBJS)
+	-rm $(TESTS) $(TEST_OBJECTS) $(OBJECTS)
 
