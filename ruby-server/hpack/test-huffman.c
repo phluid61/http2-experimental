@@ -9,22 +9,6 @@ typedef struct str {
 	uint8_t *ptr;
 } str;
 
-/*
- * GOOD:
- * ['', ''],
- * [';', "\xEC"],
- * ['3', 'G'],
- * ['33', 'B?'],
- * ['1020', "\x10\x20"],
- * ["\xA3", "\xFF\xFF\xFF\xFF"],
- * ['www.example.com', "\xE7\xCF\x9B\xEB\xE8\x9B\x6F\xB1\x6F\xA9\xB6\xFF"],
- * ['/.well-known/host-meta', "\x3B\xFC\xD7\x65\x99\xBD\xAE\x6F\x3B\x8F\x5B\x71\x76\x6B\x56\xE4\xFF"],
- *
- * BAD:
- * "\xE0", # \xE1 would be 'f', but wrong padding
- * "\xFF\xFF\xEE\x7F", # Valid encoding of EOS
- */
-
 void dump(uint8_t* buff, size_t n, char token, char literal) {
 	size_t j;
 	printf(" %c ", token);
