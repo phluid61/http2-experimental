@@ -24,7 +24,7 @@ class HTTP2_Frame
 		result = ''
 		while bytes > 0
 			buf = io.read bytes
-			raise "buffer underrun (expected #{bytes})" unless buf
+			raise IOError, "buffer underrun (expected #{bytes})" unless buf
 			result << buf
 			bytes -= buf.bytesize
 		end
