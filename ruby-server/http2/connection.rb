@@ -34,6 +34,7 @@ class HTTP2_Connection
 		#@peer = HAX.new(peer)
 		@peer = peer
 		@started = false
+		@shutdown = false
 
 		@message_handlers = []
 		@pp_handlers = []
@@ -43,14 +44,18 @@ class HTTP2_Connection
 		@peer_enable_push = true
 		@peer_max_concurrent_streams = nil
 		@peer_initial_window_size = 65535
-		@peer_accept_compression = false #XXX
+		@peer_accept_compression = false
 
-		# My settings
+		# My settings (acknowledged)
 		@header_table_size = 4096
 		@enable_push = true
 		@max_concurrent_streams = nil
 		@initial_window_size = 65535
-		@accept_compression = false #XXX
+		@accept_compression = false
+
+		# My pending settings
+		@pending_settings = {}
+		@settings_in_flight = false
 
 		# Communications
 		@recv_queue = []
@@ -66,28 +71,45 @@ class HTTP2_Connection
 	attr_reader :header_table_size, :enable_push, :max_concurrent_streams, :accept_compression
 
 	def header_table_size= s
+		raise 'wait' if @settings_in_flight # FIXME
 		# FIXME: validate
-		#@hpack_out.resize_table s
-		@header_table_size = s
-		#send_settings if @started
+		if @header_table_size != s
+			@pending_settings[:SETTINGS_HEADER_TABLE_SIZE] = s
+			send_settings if @started
+		end
 	end
 	def enable_push= p
-		@enable_push = !!p
-		#send_settings if @started
+		raise 'wait' if @settings_in_flight # FIXME
+		p = !!p
+		if @enable_push != p
+			@pending_settings[:SETTINGS_ENABLE_PUSH] = (p ? 1 : 0)
+			send_settings if @started
+		end
 	end
 	def max_concurrent_streams= x
+		raise 'wait' if @settings_in_flight # FIXME
 		# FIXME: validate
-		@max_concurrent_streams = x
-		#send_settings if @started
+		if @max_concurrent_streams != x
+			@pending_settings[:MAX_CONCURRENT_STREAMS] = x
+			send_settings if @started
+		end
 	end
 	def initial_window_size= s
+		# FIXME: barf if @started ?
+		raise 'wait' if @settings_in_flight # FIXME
 		# FIXME: validate
-		@initial_window_size = s
-		#send_settings if @started
+		if @initial_window_size != s
+			@pending_settings[:INITIAL_WINDOW_SIZE] = s
+			send_settings if @started
+		end
 	end
 	def accept_compression= c
-		@accept_compression = !!c
-		#send_settings if @started
+		raise 'wait' if @settings_in_flight # FIXME
+		c = !!c
+		if @accept_compression != c
+			@pending_settings[:ACCEPT_COMPRESSION] = (c ? 1 : 0)
+			send_settings if @started
+		end
 	end
 
 	# Add an on_message handler.
@@ -174,69 +196,61 @@ class HTTP2_Connection
 		end
 	end
 
-	def start_server
-		raise "already started" if @started
-		@started = true
-
-		# Receive standard header
-		intro = @peer.read(24)
-		if intro != HTTP2_PREFACE
-			STDERR.puts "[#{Time.now}] #{@peer.inspect}: bad preface"
-			#STDERR.puts intro.each_byte.map{|b|'%02X' % b}.join, intro.inspect
-			goaway :PROTOCOL_ERROR, debug_data: intro
-			return
-		end
-		STDERR.puts "[#{Time.now}] #{@peer.inspect}: good preface"
-
-		__start.join
-	end
-
-	def start_client
-		raise "already started" if @started
-		@started = true
-
-		# Send standard header
-		STDERR.puts "[#{Time.now}] writing preface..."
-		@peer.write HTTP2_PREFACE
-
-		STDERR.puts "[#{Time.now}] starting pump..."
-		__start
-	end
-
-	def __start
-
+	def send_settings force: false
+		raise 'wait' if @settings_in_flight # FIXME
 		# Send initial settings
-		settings = {}
-		settings[:SETTINGS_HEADER_TABLE_SIZE] = @header_table_size if @header_table_size != 4096
-		settings[:ENABLE_PUSH] = 0 unless @enable_push
-		settings[:MAX_CONCURRENT_STREAMS] = @max_concurrent_streams if @max_concurrent_streams
-		settings[:INITIAL_WINDOW_SIZE] = @initial_window_size if @initial_window_size != 65535
-		settings[:ACCEPT_COMPRESSION] = 1 if @accept_compression
-		@peer.write HTTP2_Frame_SETTINGS.new(settings).to_s
-		STDERR.puts "[#{Time.now}] #{@peer.inspect}: settings..."
+		if !@pending_settings.empty? || force
+			@peer.write HTTP2_Frame_SETTINGS.new(@pending_settings).to_s
+			STDERR.puts "[#{Time.now}] #{@peer.inspect}: settings..."
+			@settings_in_flight = true
+		end
+	end
 
-		Thread.new do
-		begin
-			# Wait for ACK
-#			recv {|g| g.type_symbol == :SETTINGS && (g.flags & HTTP2_Frame_SETTINGS::FLAG_ACK == HTTP2_Frame_SETTINGS::FLAG_ACK) }
-#			STDERR.puts "[#{Time.now}] #{@peer.inspect}: got ack"
+	def start
+		send_settings force: true
 
-			# Accept frames, and farm them out to appropriate whatsernames
-			loop do
+		# Accept frames, and farm them out to appropriate whatsernames
+		catch(:stop) do
+			until @shutdown
+#STDERR.puts 'reading...'
 				frame = recv
+#p [@shutdown, frame.type_symbol, frame]
+				throw :stop if frame.nil? && @shutdown
 				case frame.type_symbol
 				when :SETTINGS
 					# Settings frames are for me
 					settings = HTTP2_Frame_SETTINGS.from frame
+					# TODO: check the stream id == 0
 #p settings
 					if settings.ack?
-						# TODO: handle this
-						STDERR.puts "[#{Time.now}] #{@peer.inspect}: got ack"
+						# TODO: check the length == 0
+						if @settings_in_flight
+							STDERR.puts "[#{Time.now}] #{@peer.inspect}: got ack"
+							@pending_settings.each_pair do |k,v|
+								case k
+								when :SETTINGS_HEADER_TABLE_SIZE
+									#@hpack_in.resize_table v
+									@header_table_size = v
+								when :SETTINGS_ENABLE_PUSH
+									@enable_push = (v != 0)
+								when :SETTINGS_MAX_CONCURRENT_STREAMS
+									@max_concurrent_streams = v
+								when :SETTINGS_INITIAL_WINDOW_SIZE
+									@initial_window_size = v
+								when :SETTINGS_ACCEPT_COMPRESSION
+									@accept_compression = (v != 0)
+								end
+							end
+							@pending_settings = {}
+							@settings_in_flight = false
+						else
+							STDERR.puts "[#{Time.now}] #{@peer.inspect}: got unexpected ack"
+						end
 					else
 						settings.each do |k, v|
 							case k
 							when :SETTINGS_HEADER_TABLE_SIZE
-								#@hpack_in.resize_table v # FIXME: ??
+								#@hpack_out.resize_table v # FIXME: ??
 								@peer_header_table_size = v
 							when :SETTINGS_ENABLE_PUSH
 								@peer_enable_push = (v != 0) #XXX not strictly correct
@@ -248,7 +262,7 @@ class HTTP2_Connection
 								@peer_accept_compression = (v != 0) #XXX not strictly correct
 							else
 								goaway :PROTOCOL_ERROR, debug_data: "bad settings #{k}=#{v}"
-								return
+								throw :stop
 							end
 						end
 						@peer.write HTTP2_Frame_SETTINGS_ACK.new
@@ -279,10 +293,12 @@ class HTTP2_Connection
 						stream.recv_headers @hpack_in.block, *frames
 					else
 						goaway(:PROTOCOL_ERROR, debug_data: "HEADERS on #{headers.stream_id} (?? < #{@max_sid})")
+						throw :stop
 					end
 				when :CONTINUATION
 					# Should never come out of the blue
 					goaway(:PROTOCOL_ERROR, debug_data: "unexpected CONTINUATION on #{frame.stream_id}")
+					throw :stop
 				when :DATA
 					data = HTTP2_Frame_DATA.from frame
 #p data
@@ -291,6 +307,7 @@ class HTTP2_Connection
 						stream.recv_data data
 					else
 						goaway(:PROTOCOL_ERROR, debug_data: "DATA on #{data.stream_id} (??)")
+						throw :stop
 					end
 				when :GOAWAY
 					goaway = HTTP2_Frame_GOAWAY.from frame
@@ -298,9 +315,7 @@ class HTTP2_Connection
 					err = goaway.error_code
 					err = (HTTP2_Error.symbol_for(err) rescue err)
 					STDERR.print "[#{Time.now}] #{@peer.inspect}: GOAWAY [#{goaway.last_stream_id}] [#{err}] [#{goaway.debug_data.inspect}]\n"
-					# FIXME: be less violent!
-					@peer.close
-					return
+					throw :stop
 				when :PRIORITY
 					priority = HTTP2_Frame_PRIORITY.from frame
 #p priority
@@ -309,6 +324,7 @@ class HTTP2_Connection
 						stream.recv_priority priority
 					else
 						goaway(:PROTOCOL_ERROR, debug_data: "PRIORITY on #{priority.stream_id} (??)")
+						throw :stop
 					end
 				when :WINDOW_UPDATE
 					window_update = HTTP2_Frame_WINDOW_UPDATE.from frame
@@ -327,6 +343,7 @@ class HTTP2_Connection
 						stream.recv_rst_stream rst_stream
 					else
 						goaway(:PROTOCOL_ERROR, debug_data: "RST_STREAM on #{rst_stream.stream_id} (??)")
+						throw :stop
 					end
 				when :PING
 					ping = HTTP2_Frame_PING.from frame
@@ -364,28 +381,43 @@ class HTTP2_Connection
 						stream.recv_push_promise @hpack_in.block, *frames
 					else
 						goaway(:PROTOCOL_ERROR, debug_data: "PUSH_PROMISE on #{push_promise.stream_id} (??)")
+						throw :stop
 					end
 				else
 					goaway( :PROTOCOL_ERROR, debug_data: "invalid frame type #{frame.type.inspect}" )
+					throw :stop
 				end
 			end
-		rescue Exception => e
+		end
+		shutdown soft: true
+	rescue IOError, Errno::ECONNRESET, Errno::ECONNABORTED => e
+		if !@shutdown
 			puts "$$ #{e.inspect}"
 			puts e.backtrace.map{|b| "\t#{b}" }
 		end
-		end
 	rescue Exception => e
-		p e
+		puts "$$ #{e.inspect}"
 		puts e.backtrace.map{|b| "\t#{b}" }
 	end
-	private :__start
 
 	def goaway error_code, max_stream: nil, debug_data: nil
 		max_stream ||= @max_sid
 		f = HTTP2_Frame_GOAWAY.new error_code, last_stream_id: max_stream
 		f.debug_data = debug_data if debug_data
 		@peer.write f.to_s
-		#@peer.close
+		#shutdown
+	end
+
+	def shutdown soft: false
+		if !@shutdown
+			@shutdown = true
+			unless soft
+#			Thread.new do
+#				sleep 3
+				@peer.close rescue nil
+#			end
+			end
+		end
 	end
 
 	def recv &filter
