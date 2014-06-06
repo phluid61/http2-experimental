@@ -1,6 +1,6 @@
 .SUFFIXES:
 CC=/usr/bin/gcc
-CFLAGS=-Wall
+CFLAGS=-Wall -O1
 
 # Names of target libraries
 NAMES := huffman
