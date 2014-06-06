@@ -1,0 +1,1 @@
+ruby -ve 'require "./hpack"; p e=HPACK.huffman_encode("www.example.com"); puts HPACK.huffman_decode(e)'
