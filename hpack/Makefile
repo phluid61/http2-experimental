@@ -9,17 +9,51 @@ NAMES := huffman
 huffman_HEADERS = huffman.h
 huffman_OBJECTS = huffman.o
 
-# Handy rule targets
-OBJECTS := $(addsuffix .o,$(NAMES))
-TESTS := $(addprefix test-,$(NAMES))
-TEST_OBJECTS := $(addsuffix .o,$(TESTS))
+# Headers & Sources for building target libraries
+huffman_HEADER = huffman.h
+huffman_SOURCE = huffman.c
+
+# Lists ...
+OBJECTS :=
+TEST_OBJECTS :=
+TESTS :=
+
 
 #
-# General rules
+# Default rule
 #
 
 .PHONY: all
 all: objs tests
+
+
+#
+# Libraries and tests
+#
+
+define LIBRARY_RULES
+
+ifeq (,$$(findstring $(1).o,$$(OBJECTS)))
+	OBJECTS += $(1).o
+endif
+$(1).o: $$($(1)_SOURCE) $$($(1)_HEADER)
+	$$(CC) $$(CFLAGS) -c $$< -o $$@
+
+TEST_OBJECTS += test-$(1).o
+test-$(1).o: test-$(1).c $$($(1)_HEADERS)
+	$$(CC) $$(CFLAGS) -c $$< -o $$@
+
+TESTS += test-$(1)
+test-$(1): test-$(1).o $$($(1)_OBJECTS)
+	$$(CC) $$(CFLAGS) $$^ -o $$@
+
+endef
+$(foreach lib,$(NAMES),$(eval $(call LIBRARY_RULES,$(lib))))
+
+
+#
+# Working with lists
+#
 
 .PHONY: objs
 objs: $(OBJECTS)
@@ -27,35 +61,9 @@ objs: $(OBJECTS)
 .PHONY: tests
 tests: $(TESTS)
 
-.PHONY: test
-test: tests
+.PHONY: run-tests
+run-tests: tests
 	@$(foreach t,$(TESTS),echo "$(t)"; ./$(t); echo "$$? test failures";) echo "Done"
-
-#
-# Test programs
-#
-
-define TEST_rules
-$(1).o: $(1).c $$($(1)_HEADERS)
-	$$(CC) $$(CFLAGS) -c $$< -o $$@
-
-$(1): $(1).o $$($(1)_OBJECS)
-	$$(CC) $$(CFLAGS) $$< $$($(1)_OBJECTS) -o $$@
-endef
-$(foreach prog,$(TESTS),$(eval $(call TEST_rules,$(prog))))
-
-
-#
-# Objects
-#
-
-%.o: %.c %.h
-	$(CC) $(CFLAGS) -c $< -o $@
-
-
-#
-# Housekeeping
-#
 
 .PHONY: clean
 clean:
