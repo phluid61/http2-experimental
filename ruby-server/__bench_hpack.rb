@@ -58,15 +58,15 @@ puts "#{iters} iterations"
 puts ''
 
 Benchmark.bm(13) do |x|
-	x.report('Encode quads') { iters.times { $quads.map{|s| HPACK.huffman_code_for s } } }
-	x.report('Encode octas') { iters.times { $octas.map{|s| HPACK.huffman_code_for s } } }
-	x.report('Encode shorts') { iters.times { $shorts.map{|s| HPACK.huffman_code_for s } } }
-	x.report('Encode longs') { iters.times { $longs.map{|s| HPACK.huffman_code_for s } } }
+	x.report('Encode quads') { iters.times { $quads.each{|s| HPACK.huffman_code_for s } } }
+	x.report('Encode octas') { iters.times { $octas.each{|s| HPACK.huffman_code_for s } } }
+	x.report('Encode shorts') { iters.times { $shorts.each{|s| HPACK.huffman_code_for s } } }
+	x.report('Encode longs') { iters.times { $longs.each{|s| HPACK.huffman_code_for s } } }
 
-	x.report('Decode quads') { iters.times { $hquads.map{|s| HPACK.string_from s } } }
-	x.report('Decode octas') { iters.times { $hoctas.map{|s| HPACK.string_from s } } }
-	x.report('Decode shorts') { iters.times { $hshorts.map{|s| HPACK.string_from s } } }
-	x.report('Decode longs') { iters.times { $hlongs.map{|s| HPACK.string_from s } } }
+	x.report('Decode quads') { iters.times { $hquads.each{|s| HPACK.string_from s } } }
+	x.report('Decode octas') { iters.times { $hoctas.each{|s| HPACK.string_from s } } }
+	x.report('Decode shorts') { iters.times { $hshorts.each{|s| HPACK.string_from s } } }
+	x.report('Decode longs') { iters.times { $hlongs.each{|s| HPACK.string_from s } } }
 end
 
 puts ''
@@ -74,7 +74,7 @@ puts "Random permutation of all 256 bytes"
 puts ''
 
 Benchmark.bm(16) do |x|
-	x.report('Encode all bytes') { iters.times { $totals.map{|s| HPACK.huffman_code_for s } } }
-	x.report('Decode all bytes') { iters.times { $htotals.map{|s| HPACK.string_from s } } }
+	x.report('Encode all bytes') { iters.times { $totals.each{|s| HPACK.huffman_code_for s } } }
+	x.report('Decode all bytes') { iters.times { $htotals.each{|s| HPACK.string_from s } } }
 end
 
