@@ -57,24 +57,27 @@ puts "#{length} bytes per string"
 puts "#{iters} iterations"
 puts ''
 
-Benchmark.bm(13) do |x|
-	x.report('Encode quads') { iters.times { $quads.each{|s| HPACK.huffman_code_for s } } }
-	x.report('Encode octas') { iters.times { $octas.each{|s| HPACK.huffman_code_for s } } }
-	x.report('Encode shorts') { iters.times { $shorts.each{|s| HPACK.huffman_code_for s } } }
-	x.report('Encode longs') { iters.times { $longs.each{|s| HPACK.huffman_code_for s } } }
+Benchmark.bm(16, 'Encode (us/byte)', 'Decode (us/byte)') do |x|
+	a =x.report('Encode quads') { iters.times { $quads.each{|s| HPACK.huffman_code_for s } } }
+	a+=x.report('Encode octas') { iters.times { $octas.each{|s| HPACK.huffman_code_for s } } }
+	a+=x.report('Encode shorts') { iters.times { $shorts.each{|s| HPACK.huffman_code_for s } } }
+	a+=x.report('Encode longs') { iters.times { $longs.each{|s| HPACK.huffman_code_for s } } }
 
-	x.report('Decode quads') { iters.times { $hquads.each{|s| HPACK.string_from s } } }
-	x.report('Decode octas') { iters.times { $hoctas.each{|s| HPACK.string_from s } } }
-	x.report('Decode shorts') { iters.times { $hshorts.each{|s| HPACK.string_from s } } }
-	x.report('Decode longs') { iters.times { $hlongs.each{|s| HPACK.string_from s } } }
+	b =x.report('Decode quads') { iters.times { $hquads.each{|s| HPACK.string_from s } } }
+	b+=x.report('Decode octas') { iters.times { $hoctas.each{|s| HPACK.string_from s } } }
+	b+=x.report('Decode shorts') { iters.times { $hshorts.each{|s| HPACK.string_from s } } }
+	b+=x.report('Decode longs') { iters.times { $hlongs.each{|s| HPACK.string_from s } } }
+
+	[a * 1000000 / (count*length*iters), b * 1000000 / (count*length*iters)]
 end
 
 puts ''
 puts "Random permutation of all 256 bytes"
 puts ''
 
-Benchmark.bm(16) do |x|
-	x.report('Encode all bytes') { iters.times { $totals.each{|s| HPACK.huffman_code_for s } } }
-	x.report('Decode all bytes') { iters.times { $htotals.each{|s| HPACK.string_from s } } }
+Benchmark.bm(16, 'Encode (us/byte)', 'Decode (us/byte)') do |x|
+	a=x.report('Encode all bytes') { iters.times { $totals.each{|s| HPACK.huffman_code_for s } } }
+	b=x.report('Decode all bytes') { iters.times { $htotals.each{|s| HPACK.string_from s } } }
+	[a * 1000000 / (256*iters), b * 1000000 / (256*iters)]
 end
 
