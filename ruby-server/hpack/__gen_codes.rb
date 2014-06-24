@@ -104,12 +104,12 @@ class Array
 end
 h = {}
 TREE.foobar h
-puts "uint32_t HuffmanDecodes[#{h.length}] = ["
+puts "uint32_t HuffmanDecodes[#{h.length}] = {"
 h.length.times do |i|
 	#STDERR.puts [i, h[i]].inspect
 	print "\tUINT32_C(", h[i][0]<<16|h[i][1], "),\n"
 end
-puts "];"
+puts "};"
 
 
 __END__
