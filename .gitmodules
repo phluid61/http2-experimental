@@ -1,0 +1,3 @@
+[submodule "hpack-gem/mk-hpack"]
+	path = hpack-gem/mk-hpack
+	url = https://github.com/phluid61/mk-hpack.git
