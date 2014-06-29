@@ -272,7 +272,7 @@ class HPACK_Context
 			if e.size < @max
 				@table.unshift e
 				@size += e.size
-				@table.length
+				1
 			end
 		end
 
