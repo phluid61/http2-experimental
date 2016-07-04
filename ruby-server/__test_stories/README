@@ -1,3 +1,0 @@
-These come from https://github.com/http2jp/hpack-test-case
-
-I've used the nghttp2 stories. Feed one of these files into the __test_client.rb script, and check that it at the server both spit out equivalent (if out-of-order) header sets.
