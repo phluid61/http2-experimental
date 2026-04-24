@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
   push:
     branches: [main]
-    paths: ['README.md', 'LICENSE', 'code_of_conduct.md']
+    paths: ['README.md', 'LICENSE', 'code_of_conduct.md', 'hpack-gem/README.md', 'ruby-server/README.md', 'server/README.md']
 
 permissions:
   contents: write
@@ -26,7 +26,7 @@ jobs:
         id: sync
         run: |
           git fetch origin main
-          git checkout origin/main -- README.md LICENSE code_of_conduct.md
+          git checkout origin/main -- README.md LICENSE code_of_conduct.md hpack-gem/README.md ruby-server/README.md server/README.md
           if git diff --cached --quiet; then
             echo "changed=false" >> "$GITHUB_OUTPUT"
             echo "No changes detected"
@@ -98,6 +98,11 @@ jobs:
 
           # code_of_conduct.html
           build_page('code_of_conduct.md', 'code_of_conduct.html')
+
+          # Subdirectory READMEs
+          build_page('hpack-gem/README.md', 'hpack-gem/index.html')
+          build_page('ruby-server/README.md', 'ruby-server/index.html')
+          build_page('server/README.md', 'server/index.html')
           RUBY
 
       - name: Commit changes
@@ -105,6 +110,9 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add README.md LICENSE code_of_conduct.md index.html code_of_conduct.html
+          git add README.md LICENSE code_of_conduct.md index.html code_of_conduct.html \
+            hpack-gem/README.md hpack-gem/index.html \
+            ruby-server/README.md ruby-server/index.html \
+            server/README.md server/index.html
           git commit -m "Sync content files from main and rebuild"
           git push
