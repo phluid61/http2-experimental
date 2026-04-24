@@ -1,0 +1,78 @@
+---
+layout: default
+title: "server"
+---
+<h1><a href="#server" aria-hidden="true" class="anchor" id="server"></a>server</h1>
+<p>A bare-bones HTTP/2 server written in C, targeting an <strong>early draft</strong> of
+the HTTP/2 specification (pre-RFC 7540). It handles the connection
+preface and sends initial SETTINGS, but does not yet process subsequent
+frames.</p>
+<h2><a href="#building" aria-hidden="true" class="anchor" id="building"></a>Building</h2>
+<p>Requires <code>gcc</code> and <code>libpthread</code>. No external libraries.</p>
+<pre style="background-color:#2b303b;"><code><span style="color:#c0c5ce;">make
+</span></code></pre>
+<p>This produces a <code>server</code> binary.</p>
+<h2><a href="#usage" aria-hidden="true" class="anchor" id="usage"></a>Usage</h2>
+<pre style="background-color:#2b303b;"><code><span style="color:#c0c5ce;">./server &lt;port&gt;
+</span></code></pre>
+<p>The server listens on the given TCP port, accepts connections in a
+threaded loop (pool of 100), validates the HTTP/2 connection preface,
+and sends a SETTINGS frame with flow-control options enabled. The
+connection is then closed (the <code>connection_established()</code> handler is a
+stub).</p>
+<h2><a href="#architecture" aria-hidden="true" class="anchor" id="architecture"></a>Architecture</h2>
+<table>
+<thead>
+<tr>
+<th>File</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>main.c</code></td>
+<td>Entry point; parses port from <code>argv[1]</code> and starts the server</td>
+</tr>
+<tr>
+<td><code>server.c</code> / <code>server.h</code></td>
+<td>TCP server: socket, bind, listen, accept loop with a ring-buffer thread pool</td>
+</tr>
+<tr>
+<td><code>handler.c</code> / <code>handler.h</code></td>
+<td>HTTP/2 protocol handler: frame header and settings structs, connection preface validation, initial SETTINGS exchange</td>
+</tr>
+<tr>
+<td><code>callback.h</code></td>
+<td>Typedef for the handler function pointer (<code>void (*)(int sockfd)</code>)</td>
+</tr>
+<tr>
+<td><code>errors.c</code> / <code>errors.h</code></td>
+<td><code>die()</code>: variadic fatal-error function with <code>perror</code> support</td>
+</tr>
+<tr>
+<td><code>mystring.c</code> / <code>mystring.h</code></td>
+<td>Utilities: <code>fhexdump()</code> for hex dumps, <code>read_packet()</code> for exact-length reads</td>
+</tr>
+<tr>
+<td><code>Makefile</code></td>
+<td>Build rules; compiles with <code>-Wall -std=c99</code>, links <code>-lpthread</code></td>
+</tr>
+</tbody>
+</table>
+<h2><a href="#notes" aria-hidden="true" class="anchor" id="notes"></a>Notes</h2>
+<p>This implementation reflects a very early HTTP/2 draft:</p>
+<ul>
+<li>The frame header uses a <strong>16-bit length</strong> field (the final RFC 7540
+uses 24-bit).</li>
+<li>Frame type numbering differs from the final spec (e.g. <code>HEADERS</code> is
+<code>0x8</code>, <code>HEADERS_PRIORITY</code> is <code>0x1</code>).</li>
+<li>Settings IDs include SPDY-era names (<code>UPLOAD_BANDWIDTH</code>,
+<code>DOWNLOAD_BANDWIDTH</code>, <code>ROUND_TRIP_TIME</code>, <code>CURRENT_CWND</code>,
+<code>DOWNLOAD_RETRANS_RATE</code>).</li>
+<li>The connection preface can be toggled between variants via compile-time
+defines (<code>PRE_AC468F3</code>, <code>USE_ALT_HEADER</code>).</li>
+<li>The thread pool has a known race condition (marked <code>FIXME</code> in source).</li>
+</ul>
+<h2><a href="#cleaning" aria-hidden="true" class="anchor" id="cleaning"></a>Cleaning</h2>
+<pre style="background-color:#2b303b;"><code><span style="color:#c0c5ce;">make clean
+</span></code></pre>

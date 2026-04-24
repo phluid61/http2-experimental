@@ -1,0 +1,142 @@
+---
+layout: default
+title: "ruby-server"
+---
+<h1><a href="#ruby-server" aria-hidden="true" class="anchor" id="ruby-server"></a>ruby-server</h1>
+<p>A from-scratch, pure-Ruby implementation of an HTTP/2 server and client,
+including a complete HPACK header compression implementation with Huffman
+coding. This is the main experiment in the repository.</p>
+<h2><a href="#prerequisites" aria-hidden="true" class="anchor" id="prerequisites"></a>Prerequisites</h2>
+<ul>
+<li>Ruby (developed against MRI ~2.x)</li>
+<li>Bundler</li>
+</ul>
+<p>Install dependencies:</p>
+<pre style="background-color:#2b303b;"><code><span style="color:#c0c5ce;">bundle install
+</span></code></pre>
+<p>Dependencies (from Gemfile):</p>
+<ul>
+<li><code>hashmap</code> — ordered hash map</li>
+<li><code>threadpuddle</code> — thread pool</li>
+</ul>
+<h2><a href="#usage" aria-hidden="true" class="anchor" id="usage"></a>Usage</h2>
+<h3><a href="#server" aria-hidden="true" class="anchor" id="server"></a>Server</h3>
+<pre style="background-color:#2b303b;"><code><span style="color:#c0c5ce;">ruby server.rb &lt;port&gt;
+</span></code></pre>
+<p>Starts an HTTP/2 server on the given port. The server responds with
+<code>200 Ok</code> to GET requests, <code>501 Not Implemented</code> for other methods, and
+<code>400 Bad Request</code> if no method is present.</p>
+<h3><a href="#client" aria-hidden="true" class="anchor" id="client"></a>Client</h3>
+<pre style="background-color:#2b303b;"><code><span style="color:#c0c5ce;">ruby client.rb &lt;port&gt;
+</span></code></pre>
+<p>Connects to <code>localhost</code> on the given port, sends a <code>GET /</code> and a
+<code>POST /</code> (with body <code>foo</code>), then sends GOAWAY.</p>
+<h3><a href="#fake-client" aria-hidden="true" class="anchor" id="fake-client"></a>Fake client</h3>
+<pre style="background-color:#2b303b;"><code><span style="color:#c0c5ce;">ruby fake-client.rb &lt;port&gt;
+</span></code></pre>
+<p>A raw TCP client that sends hand-crafted binary frames: connection
+preface, SETTINGS, SETTINGS ACK, a GET request, a POST with body, a
+PING, and a GOAWAY. Useful for debugging the server at the wire level.</p>
+<h3><a href="#hpack-interop-test-client" aria-hidden="true" class="anchor" id="hpack-interop-test-client"></a>HPACK interop test client</h3>
+<pre style="background-color:#2b303b;"><code><span style="color:#c0c5ce;">ruby __test_client.rb &lt;port&gt; __test_stories/story_00.json
+</span></code></pre>
+<p>Reads a JSON test case file (from the
+<a href="https://github.com/http2jp/hpack-test-case">hpack-test-case</a> project)
+and sends each case's wire bytes as HEADERS frames to the server.</p>
+<h3><a href="#unit-tests" aria-hidden="true" class="anchor" id="unit-tests"></a>Unit tests</h3>
+<pre style="background-color:#2b303b;"><code><span style="color:#c0c5ce;">ruby __test_hpack.rb
+</span></code></pre>
+<p>MiniTest unit tests for the HPACK module: integer encoding/decoding,
+Huffman coding round-trips, and string encoding/decoding.</p>
+<h3><a href="#benchmarks" aria-hidden="true" class="anchor" id="benchmarks"></a>Benchmarks</h3>
+<pre style="background-color:#2b303b;"><code><span style="color:#c0c5ce;">ruby __bench_hpack.rb
+</span></code></pre>
+<p>Benchmarks Huffman encode/decode across various code-length categories.
+Sample results (from Ruby 2.1.2) are saved in <code>__bench_hpack.txt</code>.</p>
+<h2><a href="#architecture" aria-hidden="true" class="anchor" id="architecture"></a>Architecture</h2>
+<h3><a href="#hpack-layer-hpack" aria-hidden="true" class="anchor" id="hpack-layer-hpack"></a>HPACK layer (<code>hpack/</code>)</h3>
+<table>
+<thead>
+<tr>
+<th>File</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>hpack.rb</code></td>
+<td>Entry point; loads <code>hpack/context</code></td>
+</tr>
+<tr>
+<td><code>hpack/core.rb</code></td>
+<td>Low-level primitives: integer encoding/decoding (RFC 7541 §5.1), string literal encoding/decoding, Huffman coding with full code table and binary trie decoder</td>
+</tr>
+<tr>
+<td><code>hpack/context.rb</code></td>
+<td><code>HPACK_Context</code> class: reference set, dynamic/static header table with eviction, indexed/literal/never-indexed header representations, the 61-entry static table</td>
+</tr>
+<tr>
+<td><code>hpack/__gen_codes.rb</code></td>
+<td>Code generator: parses the RFC Huffman table and emits both Ruby and C lookup structures</td>
+</tr>
+<tr>
+<td><code>hpack/__gentable.rb</code></td>
+<td>Standalone utility to generate C decode tables from the Ruby trie</td>
+</tr>
+</tbody>
+</table>
+<h3><a href="#http2-layer-http2" aria-hidden="true" class="anchor" id="http2-layer-http2"></a>HTTP/2 layer (<code>http2/</code>)</h3>
+<table>
+<thead>
+<tr>
+<th>File</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>http2.rb</code></td>
+<td>Entry point; loads the server module</td>
+</tr>
+<tr>
+<td><code>http2/frame.rb</code></td>
+<td><code>HTTP2_Frame</code> base class: reads/writes the 8-byte frame header, supports all frame types</td>
+</tr>
+<tr>
+<td><code>http2/frame/</code></td>
+<td>Subclasses for each frame type (DATA, HEADERS, SETTINGS, PING, GOAWAY, etc.)</td>
+</tr>
+<tr>
+<td><code>http2/connection.rb</code></td>
+<td>Core connection state machine: HPACK contexts, settings negotiation, frame dispatch, stream management, DATA chunking, GOAWAY, PING/PONG</td>
+</tr>
+<tr>
+<td><code>http2/server_connection.rb</code></td>
+<td>Server-side connection: validates the HTTP/2 connection preface</td>
+</tr>
+<tr>
+<td><code>http2/client_connection.rb</code></td>
+<td>Client-side connection: sends the preface, starts the frame pump</td>
+</tr>
+<tr>
+<td><code>http2/server.rb</code></td>
+<td><code>HTTP2_Server</code>: listens on a TCP port with a thread pool (100 threads), dispatches connections</td>
+</tr>
+<tr>
+<td><code>http2/client.rb</code></td>
+<td><code>HTTP2_Client</code>: connects to a server, sends sample requests</td>
+</tr>
+<tr>
+<td><code>http2/stream.rb</code></td>
+<td>Stream state machine (idle → open → half-closed → closed) with header/data/push-promise/RST handling</td>
+</tr>
+<tr>
+<td><code>http2/error.rb</code></td>
+<td>All 13 HTTP/2 error codes with lookup helpers and a <code>PROTOCOL_ERROR</code> exception class</td>
+</tr>
+</tbody>
+</table>
+<h3><a href="#test-data-__test_stories" aria-hidden="true" class="anchor" id="test-data-__test_stories"></a>Test data (<code>__test_stories/</code>)</h3>
+<p>31 JSON test case files (<code>story_00.json</code> through <code>story_30.json</code>) from
+the <a href="https://github.com/http2jp/hpack-test-case">hpack-test-case</a> project
+(nghttp2 stories), used by <code>__test_client.rb</code> for HPACK interop testing.</p>

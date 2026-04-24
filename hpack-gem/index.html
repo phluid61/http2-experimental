@@ -1,0 +1,68 @@
+---
+layout: default
+title: "hpack-gem"
+---
+<h1><a href="#hpack-gem" aria-hidden="true" class="anchor" id="hpack-gem"></a>hpack-gem</h1>
+<p>A Ruby native extension (C gem) that wraps the
+<a href="https://github.com/phluid61/mk-hpack">mk-hpack</a> C library, exposing
+HPACK and Huffman encoding/decoding to Ruby.</p>
+<h2><a href="#api" aria-hidden="true" class="anchor" id="api"></a>API</h2>
+<p>The extension defines a single <code>HPACK</code> module with four singleton methods:</p>
+<ul>
+<li><code>HPACK.encode(string)</code> — HPACK-encode a string</li>
+<li><code>HPACK.decode(string)</code> — HPACK-decode a string</li>
+<li><code>HPACK.huffman_encode(string)</code> — Huffman-encode a string</li>
+<li><code>HPACK.huffman_decode(string)</code> — Huffman-decode a string</li>
+</ul>
+<p>All methods accept and return binary strings. On error, a <code>RuntimeError</code>
+is raised with the underlying C error code.</p>
+<h2><a href="#prerequisites" aria-hidden="true" class="anchor" id="prerequisites"></a>Prerequisites</h2>
+<p>The <code>mk-hpack</code> submodule must be initialised before building. From the
+repository root:</p>
+<pre style="background-color:#2b303b;"><code><span style="color:#c0c5ce;">git submodule update --init mk-hpack
+</span></code></pre>
+<p>The <code>mk-hpack/</code> directory inside <code>hpack-gem/</code> expects a pre-built
+<code>hpack.h</code> header and <code>libhpack.a</code> static library from the submodule.</p>
+<p>You will also need a working Ruby development environment (with
+<code>mkmf</code>/<code>ruby.h</code>).</p>
+<h2><a href="#building" aria-hidden="true" class="anchor" id="building"></a>Building</h2>
+<pre style="background-color:#2b303b;"><code><span style="color:#c0c5ce;">cd hpack-gem
+</span><span style="color:#c0c5ce;">ruby extconf.rb
+</span><span style="color:#c0c5ce;">make
+</span></code></pre>
+<p>This produces <code>hpack.so</code> (or equivalent shared library for your
+platform).</p>
+<h2><a href="#testing" aria-hidden="true" class="anchor" id="testing"></a>Testing</h2>
+<p>A manual test script is included:</p>
+<pre style="background-color:#2b303b;"><code><span style="color:#c0c5ce;">ruby test/test.rb
+</span></code></pre>
+<p>The test encodes and decodes several sample strings
+(e.g. <code>www.example.com</code>, <code>/sample/path</code>) and verifies round-trip
+correctness for both Huffman and HPACK operations.</p>
+<h2><a href="#files" aria-hidden="true" class="anchor" id="files"></a>Files</h2>
+<table>
+<thead>
+<tr>
+<th>File</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>extconf.rb</code></td>
+<td><code>mkmf</code> build script; locates <code>hpack.h</code> and <code>libhpack.a</code></td>
+</tr>
+<tr>
+<td><code>hpack.c</code></td>
+<td>C extension source; bridges mk-hpack functions to Ruby</td>
+</tr>
+<tr>
+<td><code>mk-hpack/</code></td>
+<td>Expected location of the built mk-hpack library</td>
+</tr>
+<tr>
+<td><code>test/test.rb</code></td>
+<td>Manual round-trip test script</td>
+</tr>
+</tbody>
+</table>

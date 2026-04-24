@@ -3,7 +3,17 @@ http2-experimental
 
 A place to experiment with the HTTP/2 spec.
 
+
+### Experiments
+
+* [hpack-gem](hpack-gem/README.md)
+* [ruby-server](ruby-server/README.md)
+* [server](server/README.md)
+
 The more interesting code at the moment can be found in the `ruby-server` directory.
+
+
+### Links
 
 * Repo: <https://github.com/phluid61/http2-experimental>
 * Issues: <https://github.com/phluid61/http2-experimental/issues>
